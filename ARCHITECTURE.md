@@ -1,4 +1,4 @@
-# UCT INF4001N — Application Architecture
+# UCT INF4001N — Web Application Architecture
 
 ## 1. Project objective
 

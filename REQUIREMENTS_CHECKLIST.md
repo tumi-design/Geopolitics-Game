@@ -1,4 +1,4 @@
-# UCT INF4001N — Requirements Checklist
+# UCT INF4001N — Marksheet Requirements Checklist
 
 Deadline: 6 November 2026, 23:00
 
