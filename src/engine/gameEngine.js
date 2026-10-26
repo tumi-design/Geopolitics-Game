@@ -1,3 +1,5 @@
+import { getConquestReward, rollCombatRound } from "./gameRules.js";
+
 /** Shared checks for all player actions. These never modify the game. */
 function validateCurrentPlayer(game, playerId) {
   if (game.status !== "active" || game.winnerId !== null) {
@@ -29,6 +31,9 @@ function validateCurrentPlayer(game, playerId) {
  */
 export function advanceTurn(game, playerId) {
   validateCurrentPlayer(game, playerId);
+  if (game.attackInProgress) {
+    throw new Error("Stop the attack or complete conquest before advancing the turn.");
+  }
   if (game.pendingReinforcements > 0) {
     throw new Error("Allocate all reinforcements before ending the turn.");
   }
@@ -56,6 +61,9 @@ export function advanceTurn(game, playerId) {
       round,
       turnsTakenThisRound: newRound ? 0 : game.turnsTakenThisRound + 1,
       pendingReinforcements: round >= 2 ? ownedCountryCount * 2 : 0,
+      attackUsedThisTurn: false,
+      activeAttack: null,
+      attackInProgress: false,
     };
   }
 
@@ -64,6 +72,7 @@ export function advanceTurn(game, playerId) {
 
 /** Skip the current turn without changing soldiers or country ownership. */
 export function skipTurn(game, playerId) {
+  if (game.attackInProgress) return stopAttack(game, playerId);
   return advanceTurn(game, playerId);
 }
 
@@ -160,4 +169,171 @@ export function transferSoldiers(game, playerId, sourceCountryId, targetCountryI
       return country;
     }),
   };
+}
+
+/** Append plain data that can later be displayed or sent for commentary. */
+function recordBattleEvent(game, type, details = {}) {
+  const event = {
+    id: game.battleLog.length + 1,
+    type,
+    round: game.round,
+    playerId: game.currentPlayerId,
+    ...game.activeAttack,
+    ...details,
+  };
+  return { ...game, battleLog: [...game.battleLog, event] };
+}
+
+function validateCombatSoldiers(country) {
+  if (!Number.isSafeInteger(country.soldiers) || country.soldiers < 1) {
+    throw new RangeError("Combat requires safe positive integer soldier counts.");
+  }
+}
+
+/** Select one attacking country and one enemy target. No dice are rolled yet. */
+export function startAttack(game, playerId, sourceCountryId, targetCountryId) {
+  validateCurrentPlayer(game, playerId);
+  if (game.attackInProgress || game.attackUsedThisTurn) {
+    throw new Error("Only one attack may be initiated per turn.");
+  }
+  if (game.pendingReinforcements > 0) {
+    throw new Error("Allocate all reinforcements before attacking.");
+  }
+  const source = getOwnedCountry(game, playerId, sourceCountryId);
+  const target = game.countries.find((country) => country.id === targetCountryId);
+  if (!target || target.ownerId === playerId) {
+    throw new Error("The target must be an enemy country.");
+  }
+  validateCombatSoldiers(source);
+  validateCombatSoldiers(target);
+  if (source.soldiers < 2) {
+    throw new RangeError("The attacker needs at least two soldiers.");
+  }
+
+  return recordBattleEvent({
+    ...game,
+    attackInProgress: true,
+    attackUsedThisTurn: true,
+    activeAttack: {
+      sourceCountryId,
+      targetCountryId,
+      defenderPlayerId: target.ownerId,
+      phase: "combat",
+      phaseNumber: 0,
+    },
+  }, "attack_started", {
+    attackingSoldiers: source.soldiers,
+    defendingSoldiers: target.soldiers,
+  });
+}
+
+function getActiveAttack(game, playerId, expectedPhase) {
+  validateCurrentPlayer(game, playerId);
+  if (!game.attackInProgress || game.activeAttack?.phase !== expectedPhase) {
+    throw new Error(`An attack in the ${expectedPhase} phase is required.`);
+  }
+  const source = getOwnedCountry(game, playerId, game.activeAttack.sourceCountryId);
+  const target = game.countries.find((country) => country.id === game.activeAttack.targetCountryId);
+  if (!target || target.ownerId !== game.activeAttack.defenderPlayerId || target.ownerId === playerId) {
+    throw new Error("The attack target's ownership is inconsistent.");
+  }
+  return { source, target };
+}
+
+/** Clear attack state, retaining all battle events and soldier changes. */
+function clearAttack(game) {
+  return { ...game, attackInProgress: false, activeAttack: null };
+}
+
+/** Roll exactly one paired-dice phase; the latest event holds its full results. */
+export function rollAttackPhase(game, playerId, random = Math.random) {
+  const { source, target } = getActiveAttack(game, playerId, "combat");
+  validateCombatSoldiers(source);
+  validateCombatSoldiers(target);
+  const result = rollCombatRound(source.soldiers, target.soldiers, random);
+  const attackingSoldiers = source.soldiers - result.attackerLosses;
+  const defendingSoldiers = target.soldiers - result.defenderLosses;
+  const outcome = defendingSoldiers === 0 ? "conquest_pending"
+    : attackingSoldiers === 1 ? "attack_failed" : "continue";
+
+  let next = {
+    ...game,
+    activeAttack: {
+      ...game.activeAttack,
+      phase: defendingSoldiers === 0 ? "conquest" : "combat",
+      phaseNumber: game.activeAttack.phaseNumber + 1,
+    },
+    countries: game.countries.map((country) => {
+      if (country.id === source.id) return { ...country, soldiers: attackingSoldiers };
+      if (country.id === target.id) return { ...country, soldiers: defendingSoldiers };
+      return country;
+    }),
+  };
+  next = recordBattleEvent(next, "combat_phase", {
+    ...result,
+    attackingSoldiersBefore: source.soldiers,
+    defendingSoldiersBefore: target.soldiers,
+    attackingSoldiers,
+    defendingSoldiers,
+    outcome,
+  });
+  if (outcome === "attack_failed") {
+    return advanceTurn(clearAttack(next), playerId);
+  }
+  return next;
+}
+
+/** Voluntarily stop rolling, preserve remaining armies, and end the turn. */
+export function stopAttack(game, playerId) {
+  const { source, target } = getActiveAttack(game, playerId, "combat");
+  const next = recordBattleEvent(game, "attack_stopped", {
+    attackingSoldiers: source.soldiers,
+    defendingSoldiers: target.soldiers,
+  });
+  return advanceTurn(clearAttack(next), playerId);
+}
+
+/**
+ * Finalise a defeated target using the player's chosen occupation count.
+ * The reward goes to the source first; move 1..(source + reward - 1) soldiers.
+ * Until this action succeeds, a zero-defender country is a pending conquest,
+ * and no rolling, transfers, skipping, or turn advancement is allowed.
+ */
+export function completeConquest(game, playerId, soldiersToTransfer) {
+  const { source, target } = getActiveAttack(game, playerId, "conquest");
+  validateCombatSoldiers(source);
+  if (target.soldiers !== 0) {
+    throw new Error("Conquest requires a defeated country with zero soldiers.");
+  }
+  const reward = getConquestReward(target.originalSoldierValue);
+  validateSoldierAddition(source, reward);
+  const availableSoldiers = source.soldiers + reward;
+  if (
+    !Number.isSafeInteger(soldiersToTransfer) ||
+    soldiersToTransfer < 1 ||
+    soldiersToTransfer >= availableSoldiers
+  ) {
+    throw new RangeError("Occupy the conquered country with at least one soldier and leave one behind.");
+  }
+
+  const countries = game.countries.map((country) => {
+    if (country.id === source.id) return { ...country, soldiers: availableSoldiers - soldiersToTransfer };
+    if (country.id === target.id) return { ...country, ownerId: playerId, soldiers: soldiersToTransfer };
+    return country;
+  });
+  const eliminated = !countries.some((country) => country.ownerId === target.ownerId);
+  const victory = countries.length === 10 && countries.every((country) => country.ownerId === playerId);
+  let next = recordBattleEvent({ ...game, countries }, "country_conquered", {
+    previousOwnerId: target.ownerId,
+    originalSoldierValue: target.originalSoldierValue,
+    reward,
+    soldiersTransferred: soldiersToTransfer,
+    attackingSoldiers: availableSoldiers - soldiersToTransfer,
+    defendingSoldiers: soldiersToTransfer,
+  });
+  if (eliminated) next = recordBattleEvent(next, "player_eliminated", { eliminatedPlayerId: target.ownerId });
+  if (victory) next = recordBattleEvent(next, "victory", { winnerId: playerId });
+  next = clearAttack(next);
+  if (victory) return { ...next, status: "finished", winnerId: playerId };
+  return advanceTurn(next, playerId);
 }
