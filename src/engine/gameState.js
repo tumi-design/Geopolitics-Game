@@ -159,5 +159,6 @@ export function createInitialGame(
     attackUsedThisTurn: false,
     pendingReinforcements: 0,
     battleLog: [],
+    npcDecisionLog: [],
   };
 }
