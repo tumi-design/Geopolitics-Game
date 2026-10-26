@@ -108,8 +108,9 @@ export function resolveCombatRound(attackerRolls, defenderRolls) {
     Number.isInteger(roll) && roll >= 1 && roll <= 6;
 
   if (
-    !attackerRolls.every(validRoll) ||
-    !defenderRolls.every(validRoll)
+    // Array.from turns empty positions into undefined, which fails validation.
+    !Array.from(attackerRolls).every(validRoll) ||
+    !Array.from(defenderRolls).every(validRoll)
   ) {
     throw new RangeError("Every die result must be an integer from 1 to 6.");
   }

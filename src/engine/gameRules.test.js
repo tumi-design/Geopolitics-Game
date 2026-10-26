@@ -78,3 +78,13 @@ test("a tied pair causes no losses", () => {
 test("combat cannot start with one attacking soldier", () => {
   assert.throws(() => rollCombatRound(1, 5), RangeError);
 });
+
+test("combat rejects missing dice on either side", () => {
+  const partiallyMissingRolls = [6, 4, 2];
+  delete partiallyMissingRolls[1];
+  for (const invalidRolls of [Array(1), partiallyMissingRolls, [undefined], [0], [7], [1.5]]) {
+    const validRolls = Array(invalidRolls.length).fill(4);
+    assert.throws(() => resolveCombatRound(invalidRolls, validRolls), RangeError);
+    assert.throws(() => resolveCombatRound(validRolls, invalidRolls), RangeError);
+  }
+});
