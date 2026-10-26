@@ -155,6 +155,7 @@ export function createInitialGame(
     status: "active",
     winnerId: null,
     attackInProgress: false,
+    pendingReinforcements: 0,
     battleLog: [],
   };
 }
