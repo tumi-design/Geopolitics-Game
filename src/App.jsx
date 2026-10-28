@@ -1,122 +1,75 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+﻿import { useState } from 'react';
+import { createInitialGame } from './engine/gameState.js';
+import { countries, getCountryMetadata } from './data/countries.js';
+import GameSetup from './components/GameSetup.jsx';
+import CountryList from './components/CountryList.jsx';
+import CountryDetails from './components/CountryDetails.jsx';
+import WorldMap from './components/WorldMap.jsx';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [game, setGame] = useState(null);
+  const [settingUp, setSettingUp] = useState(true);
+  const [startingId, setStartingId] = useState('710');
+  const [inspectedId, setInspectedId] = useState('710');
+  const [error, setError] = useState('');
+  const displayedGame = settingUp ? null : game;
+  const selectedId = settingUp ? startingId : inspectedId;
+  const displayedCountries = displayedGame?.countries ?? countries;
+  const selectedCountry = displayedCountries.find((country) => country.id === selectedId);
+  const owner = displayedGame?.players.find((player) => player.id === selectedCountry?.ownerId);
+  const activePlayer = displayedGame?.players.find((player) => player.id === displayedGame.currentPlayerId);
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+  function selectCountry(id) {
+    if (settingUp) setStartingId(id);
+    else setInspectedId(id);
+  }
+  function createGame() {
+    try {
+      const next = createInitialGame(countries, startingId);
+      setGame(next);
+      setInspectedId(startingId);
+      setSettingUp(false);
+      setError('');
+    } catch (failure) {
+      setError(`Could not create the game: ${failure.message}`);
+    }
+  }
+
+  return <div className="app-shell">
+    <a className="skip-link" href="#main-content">Skip to content</a>
+    <header className="site-header">
+      <div className="brand"><span className="brand-symbol" aria-hidden="true">◎</span><div>GEOPOLITICS<span>TEN NATIONS. ONE VICTOR.</span></div></div>
+      <div className="header-location"><span className="header-dot" />WORLD OVERVIEW</div>
+      <span className="preview-label">DESIGN PREVIEW <span>01</span></span>
+    </header>
+    <main id="main-content">
+      <div className="page-intro">
+        <div><span className="eyebrow">TEN COUNTRIES. ONE WORLD.</span>
+          <h1>{displayedGame ? 'Explore thoughtfully. Think globally.' : 'Choose your perspective.'}</h1>
+          <p>{displayedGame ? 'Explore the countries and the people competing for them.' : 'Every journey begins somewhere. Where will yours begin?'}</p>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        {displayedGame && <button type="button" className="secondary-button" onClick={() => setSettingUp(true)}>New game <span aria-hidden="true">↗</span></button>}
+      </div>
+      <div className="overview-strip" aria-live="polite">
+        <div><span className="strip-label">{displayedGame ? 'ROUND' : 'GAMEPLAY'}</span><strong>{displayedGame ? String(game.round).padStart(2, '0') : 'Single player'}</strong></div>
+        <div><span className="strip-label">{displayedGame ? 'ACTIVE PLAYER' : 'THE WORLD'}</span><strong>{activePlayer?.name ?? '10 countries'}</strong></div>
+        <div><span className="strip-label">{displayedGame ? 'YOUR COUNTRY' : 'OPPONENTS'}</span><strong>{displayedGame ? game.countries.find((country) => country.ownerId === 'human-player')?.name : '9 strategic NPCs'}</strong></div>
+        <span className="milestone-label">{displayedGame ? 'Viewing only · turn controls coming later' : 'Setup & exploration'}</span>
+      </div>
+      <div className="workspace">
+        {settingUp ? <GameSetup selectedId={startingId} onSelect={selectCountry} onCreate={createGame} error={error}
+          onCancel={game ? () => setSettingUp(false) : null} />
+          : <section className="panel roster-panel" aria-labelledby="roster-title">
+            <div className="panel-heading"><span className="eyebrow">01 / PARTICIPANTS</span>
+              <h2 id="roster-title">Countries in play <span className="count-badge">10</span></h2><p>Select a country to explore its profile.</p></div>
+            <CountryList countries={game.countries} selectedId={inspectedId} onSelect={selectCountry} game={game} />
+          </section>}
+        <WorldMap countries={displayedCountries} selectedId={selectedId} onSelect={selectCountry} game={displayedGame} />
+        <CountryDetails country={selectedCountry} metadata={getCountryMetadata(selectedId)} owner={owner} game={displayedGame} />
+      </div>
+      <div className="development-note"><span className="note-icon" aria-hidden="true">i</span><p><strong>Development data.</strong> The 31-country catalogue uses placeholder populations of 10 million for every country. Real population data will be verified before gameplay release.</p></div>
+    </main>
+    <footer className="site-footer"><span>UCT INF4001N <span className="footer-divider">/</span> BCOM HONS IS 2027</span><span>Explore thoughtfully. Think globally.</span></footer>
+  </div>;
 }
-
-export default App
