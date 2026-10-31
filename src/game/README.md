@@ -57,6 +57,7 @@ victory and elimination rules are unchanged.
 - `../components/GameActivity.jsx`: dice, outcomes, battle history and NPC explanations.
 - `../engine/`: the unchanged, tested game rules and NPC strategy.
 
-Games and histories live only in React memory; refreshing resets them. Country
-population fixtures remain labelled development data. Firebase, accounts,
-deployment, verified populations and LLM battle commentary are not included.
+Games and histories live only in React memory; refreshing resets them. The
+55-country catalogue uses Worldometer's 2026 annual population estimates, with
+per-country source links and reference-year documentation in `../data/README.md`.
+Firebase, accounts, deployment and LLM battle commentary are not included.

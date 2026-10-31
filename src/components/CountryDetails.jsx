@@ -14,9 +14,9 @@ export default function CountryDetails({ country, metadata, owner, game }) {
     <dl className="country-facts">
       <div><dt>{game ? 'Owner' : 'Prospective owner'}</dt><dd>{owner?.name ?? 'You'}</dd></div>
       <div><dt>{game ? 'Soldiers' : 'Starting soldiers'}</dt><dd className="large-number">{country.soldiers ?? getStartingSoldiers(country.population)}</dd></div>
-      <div><dt>Population <span className="fixture-tag">PLACEHOLDER</span></dt><dd>{country.population.toLocaleString('en-ZA')}</dd></div>
+      <div><dt>Population <span className="fixture-tag">{metadata.populationYear}</span></dt><dd>{country.population.toLocaleString('en-ZA')}</dd></div>
     </dl>
-    <p className="data-disclaimer">Temporary development data: every country uses a population of 10 million. These are not real population figures.</p>
+    <p className="data-disclaimer"><a href={metadata.populationSourceUrl} target="_blank" rel="noreferrer">Worldometer · {metadata.populationYear}</a> annual population estimate. Starting soldiers follow the UCT population thresholds.</p>
     <div className="profile-note"><span className="eyebrow">THE BIGGER PICTURE</span><p>Every country is within reach. Geography does not restrict attacks.</p></div>
   </aside>;
 }

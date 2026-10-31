@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { countries, filterCountries } from '../data/countries.js';
+import { countries, filterCountries, populationReference } from '../data/countries.js';
 import CountryList from './CountryList.jsx';
 
 export default function GameSetup({ selectedId, onSelect, onCreate, onCancel, error }) {
@@ -12,7 +12,7 @@ export default function GameSetup({ selectedId, onSelect, onCreate, onCancel, er
     <label className="search-label" htmlFor="country-search">Search countries</label>
     <div className="search-field"><span aria-hidden="true">⌕</span><input id="country-search" type="search"
       value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or region…" autoComplete="off" /></div>
-    <p className="result-count" role="status">{results.length} countries · development catalogue</p>
+    <p className="result-count" role="status">{results.length} countries · Worldometer {populationReference.year}</p>
     <CountryList countries={results} selectedId={selectedId} onSelect={onSelect} />
     <div className="setup-footer">
       {error && <p className="error-message" role="alert">{error}</p>}

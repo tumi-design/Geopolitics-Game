@@ -5,7 +5,9 @@ import { countries } from '../data/countries.js';
 import { applyHumanAction, advanceNpcPlayback, getSessionStatus, playbackDelay } from './gameSession.js';
 
 function makeGame() {
-  const game = createInitialGame(countries, '710', () => 0.5);
+  // Isolate these combat scenarios from changes to real demographic data.
+  const fixtures = countries.map((country) => ({ ...country, population: 10_000_000 }));
+  const game = createInitialGame(fixtures, '710', () => 0.5);
   game.turnOrder = game.players.map((player) => player.id);
   game.currentPlayerId = 'human-player';
   return game;

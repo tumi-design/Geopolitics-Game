@@ -1,0 +1,228 @@
+{
+  "referenceYear": 2026,
+  "retrievedOn": "2026-10-31",
+  "sourceUrl": "https://www.worldometers.info/world-population/population-by-country/",
+  "description": "Worldometer Population 2026 annual estimates, not live population clocks.",
+  "countries": {
+    "India": {
+      "population": 1476625576,
+      "sourceUrl": "https://www.worldometers.info/world-population/india-population/"
+    },
+    "China": {
+      "population": 1412914089,
+      "sourceUrl": "https://www.worldometers.info/world-population/china-population/"
+    },
+    "United States": {
+      "population": 349035494,
+      "sourceUrl": "https://www.worldometers.info/world-population/us-population/"
+    },
+    "Indonesia": {
+      "population": 287886782,
+      "sourceUrl": "https://www.worldometers.info/world-population/indonesia-population/"
+    },
+    "Pakistan": {
+      "population": 259299791,
+      "sourceUrl": "https://www.worldometers.info/world-population/pakistan-population/"
+    },
+    "Nigeria": {
+      "population": 242431832,
+      "sourceUrl": "https://www.worldometers.info/world-population/nigeria-population/"
+    },
+    "Brazil": {
+      "population": 213562666,
+      "sourceUrl": "https://www.worldometers.info/world-population/brazil-population/"
+    },
+    "Ethiopia": {
+      "population": 138902185,
+      "sourceUrl": "https://www.worldometers.info/world-population/ethiopia-population/"
+    },
+    "Mexico": {
+      "population": 132997658,
+      "sourceUrl": "https://www.worldometers.info/world-population/mexico-population/"
+    },
+    "Japan": {
+      "population": 122427731,
+      "sourceUrl": "https://www.worldometers.info/world-population/japan-population/"
+    },
+    "Egypt": {
+      "population": 120101175,
+      "sourceUrl": "https://www.worldometers.info/world-population/egypt-population/"
+    },
+    "Vietnam": {
+      "population": 102177431,
+      "sourceUrl": "https://www.worldometers.info/world-population/vietnam-population/"
+    },
+    "Germany": {
+      "population": 83644258,
+      "sourceUrl": "https://www.worldometers.info/world-population/germany-population/"
+    },
+    "Tanzania": {
+      "population": 72563780,
+      "sourceUrl": "https://www.worldometers.info/world-population/tanzania-population/"
+    },
+    "Thailand": {
+      "population": 71559614,
+      "sourceUrl": "https://www.worldometers.info/world-population/thailand-population/"
+    },
+    "United Kingdom": {
+      "population": 69931528,
+      "sourceUrl": "https://www.worldometers.info/world-population/uk-population/"
+    },
+    "France": {
+      "population": 66746401,
+      "sourceUrl": "https://www.worldometers.info/world-population/france-population/"
+    },
+    "South Africa": {
+      "population": 65453084,
+      "sourceUrl": "https://www.worldometers.info/world-population/south-africa-population/"
+    },
+    "Italy": {
+      "population": 58926166,
+      "sourceUrl": "https://www.worldometers.info/world-population/italy-population/"
+    },
+    "Kenya": {
+      "population": 58636412,
+      "sourceUrl": "https://www.worldometers.info/world-population/kenya-population/"
+    },
+    "Colombia": {
+      "population": 53936226,
+      "sourceUrl": "https://www.worldometers.info/world-population/colombia-population/"
+    },
+    "South Korea": {
+      "population": 51600388,
+      "sourceUrl": "https://www.worldometers.info/world-population/south-korea-population/"
+    },
+    "Spain": {
+      "population": 47850793,
+      "sourceUrl": "https://www.worldometers.info/world-population/spain-population/"
+    },
+    "Argentina": {
+      "population": 46003734,
+      "sourceUrl": "https://www.worldometers.info/world-population/argentina-population/"
+    },
+    "Canada": {
+      "population": 40467728,
+      "sourceUrl": "https://www.worldometers.info/world-population/canada-population/"
+    },
+    "Morocco": {
+      "population": 38762441,
+      "sourceUrl": "https://www.worldometers.info/world-population/morocco-population/"
+    },
+    "Poland": {
+      "population": 37843188,
+      "sourceUrl": "https://www.worldometers.info/world-population/poland-population/"
+    },
+    "Ghana": {
+      "population": 35697557,
+      "sourceUrl": "https://www.worldometers.info/world-population/ghana-population/"
+    },
+    "Saudi Arabia": {
+      "population": 35165787,
+      "sourceUrl": "https://www.worldometers.info/world-population/saudi-arabia-population/"
+    },
+    "Peru": {
+      "population": 34922148,
+      "sourceUrl": "https://www.worldometers.info/world-population/peru-population/"
+    },
+    "Australia": {
+      "population": 27227096,
+      "sourceUrl": "https://www.worldometers.info/world-population/australia-population/"
+    },
+    "Zambia": {
+      "population": 22521915,
+      "sourceUrl": "https://www.worldometers.info/world-population/zambia-population/"
+    },
+    "Chile": {
+      "population": 19945850,
+      "sourceUrl": "https://www.worldometers.info/world-population/chile-population/"
+    },
+    "Senegal": {
+      "population": 19366548,
+      "sourceUrl": "https://www.worldometers.info/world-population/senegal-population/"
+    },
+    "Netherlands": {
+      "population": 18448775,
+      "sourceUrl": "https://www.worldometers.info/world-population/netherlands-population/"
+    },
+    "Ecuador": {
+      "population": 18444506,
+      "sourceUrl": "https://www.worldometers.info/world-population/ecuador-population/"
+    },
+    "Papua New Guinea": {
+      "population": 10947848,
+      "sourceUrl": "https://www.worldometers.info/world-population/papua-new-guinea-population/"
+    },
+    "Cuba": {
+      "population": 10892659,
+      "sourceUrl": "https://www.worldometers.info/world-population/cuba-population/"
+    },
+    "Sweden": {
+      "population": 10701047,
+      "sourceUrl": "https://www.worldometers.info/world-population/sweden-population/"
+    },
+    "Portugal": {
+      "population": 10395362,
+      "sourceUrl": "https://www.worldometers.info/world-population/portugal-population/"
+    },
+    "Greece": {
+      "population": 9897115,
+      "sourceUrl": "https://www.worldometers.info/world-population/greece-population/"
+    },
+    "Switzerland": {
+      "population": 9007798,
+      "sourceUrl": "https://www.worldometers.info/world-population/switzerland-population/"
+    },
+    "Denmark": {
+      "population": 6023520,
+      "sourceUrl": "https://www.worldometers.info/world-population/denmark-population/"
+    },
+    "Norway": {
+      "population": 5652989,
+      "sourceUrl": "https://www.worldometers.info/world-population/norway-population/"
+    },
+    "Finland": {
+      "population": 5621739,
+      "sourceUrl": "https://www.worldometers.info/world-population/finland-population/"
+    },
+    "Ireland": {
+      "population": 5356950,
+      "sourceUrl": "https://www.worldometers.info/world-population/ireland-population/"
+    },
+    "New Zealand": {
+      "population": 5287479,
+      "sourceUrl": "https://www.worldometers.info/world-population/new-zealand-population/"
+    },
+    "Costa Rica": {
+      "population": 5174789,
+      "sourceUrl": "https://www.worldometers.info/world-population/costa-rica-population/"
+    },
+    "Namibia": {
+      "population": 3153246,
+      "sourceUrl": "https://www.worldometers.info/world-population/namibia-population/"
+    },
+    "Botswana": {
+      "population": 2603388,
+      "sourceUrl": "https://www.worldometers.info/world-population/botswana-population/"
+    },
+    "Russia": {
+      "population": 143394458,
+      "sourceUrl": "https://www.worldometers.info/world-population/russia-population/"
+    },
+    "Türkiye": {
+      "population": 87926082,
+      "sourceUrl": "https://www.worldometers.info/world-population/turkey-population/"
+    },
+    "Iran": {
+      "population": 93168497,
+      "sourceUrl": "https://www.worldometers.info/world-population/iran-population/"
+    },
+    "Democratic Republic of the Congo": {
+      "population": 116452162,
+      "sourceUrl": "https://www.worldometers.info/world-population/democratic-republic-of-the-congo-population/"
+    },
+    "Algeria": {
+      "population": 48028334,
+      "sourceUrl": "https://www.worldometers.info/world-population/algeria-population/"
+    }
+  }
+}

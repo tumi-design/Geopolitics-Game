@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { createInitialGame } from './engine/gameState.js';
-import { countries, getCountryMetadata } from './data/countries.js';
+import { countries, getCountryMetadata, populationReference } from './data/countries.js';
 import GameSetup from './components/GameSetup.jsx';
 import CountryList from './components/CountryList.jsx';
 import CountryDetails from './components/CountryDetails.jsx';
@@ -83,7 +83,7 @@ export default function App() {
           inspectedId={inspectedId} onAction={session.act} />
         <GameActivity game={game} />
       </div>}
-      <div className="development-note"><span className="note-icon" aria-hidden="true">i</span><p><strong>Development data.</strong> The 31-country catalogue uses placeholder populations of 10 million for every country. Real population data will be verified before gameplay release.</p></div>
+      <div className="development-note"><span className="note-icon" aria-hidden="true">i</span><p><strong>Population reference.</strong> The {countries.length}-country catalogue uses <a href={populationReference.sourceUrl} target="_blank" rel="noreferrer">Worldometer {populationReference.year}</a> annual estimates. Starting soldiers follow the UCT population thresholds.</p></div>
     </main>
     <footer className="site-footer"><span>UCT INF4001N <span className="footer-divider">/</span> BCOM HONS IS 2027</span><span>Explore thoughtfully. Think globally.</span></footer>
   </div>;
