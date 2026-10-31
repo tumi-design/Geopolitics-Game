@@ -1,0 +1,62 @@
+# Local gameplay and presentation guide
+
+Start the application from the repository root with `npm.cmd run dev` and open
+the Local URL Vite prints. `node --test`, `npm.cmd run lint`, and
+`npm.cmd run build` run the automated checks.
+
+## Playing a turn
+
+1. Create a game. The engine randomly chooses the starting player. NPCs play
+   automatically, one explained action per timer tick.
+2. On your turn, use the controls below the world overview. From round two,
+   distribute the pending reinforcements before attacking or skipping. Partial
+   allocations are allowed; all remaining soldiers still need allocation.
+3. Choose an owned attacking country and any enemy target. Click Start attack,
+   then Roll combat phase to resolve each phase. Stop attack & end turn preserves
+   the soldiers left on the board. Running out of attacking soldiers ends the
+   turn automatically.
+4. When defenders reach zero, choose occupation soldiers. The existing engine
+   awards the conquest reward to the source first, then moves the chosen amount
+   to the captured country. Leave at least one soldier in both. Complete conquest
+   finalises ownership and ends the turn (or declares victory).
+5. Once you own multiple countries, the transfer form moves soldiers between
+   them outside combat. Transferring does not finish your turn.
+
+The map and list inspect countries; the action forms select combat/transfer
+sources and targets. Country ownership, soldier counts, and map tooltips always
+come from the current engine state. Distance never limits target choices.
+
+## NPC playback
+
+Normal speed waits 1600 ms per action, 2x waits 800 ms, and 4x waits 400 ms.
+Speed changes never jump to the final turn state. The existing strategy limits
+combat to 100 phases; the UI additionally stops after 200 actions in one turn.
+Pause stops the timer. Opening new-game setup also suspends playback and retains
+the current game until a replacement is created. Errors retain the last valid
+board. Dismiss an error before resuming playback; persistent invalid state or
+safety-limit errors require starting a new game.
+
+The latest dice remain visible between moves. Battle history and NPC decisions
+show all retained records, newest first, in separately scrollable lists.
+NPC explanations are strategy-generated text, not LLM commentary.
+
+Victory means the human owns all ten countries. If the human loses their last
+country, this local session stops at the defeat position rather than continuing
+to simulate a spectator-only match between the remaining NPCs. The engine's
+victory and elimination rules are unchanged.
+
+## Files to explain
+
+- `gameSession.js`: small routing functions send UI actions to the existing engine;
+  `getSessionStatus` decides whether human input or NPC playback is allowed.
+- `../hooks/useGameSession.js`: owns the live game, errors, playback speed and timer.
+  Random engine actions run outside React state updater functions to avoid
+  duplicate execution in development StrictMode. Stale timers are discarded.
+- `../components/TurnControls.jsx`: reinforcement, transfer, combat and occupation forms.
+- `../components/PlaybackControls.jsx`: status, pause, fast-forward and error messages.
+- `../components/GameActivity.jsx`: dice, outcomes, battle history and NPC explanations.
+- `../engine/`: the unchanged, tested game rules and NPC strategy.
+
+Games and histories live only in React memory; refreshing resets them. Country
+population fixtures remain labelled development data. Firebase, accounts,
+deployment, verified populations and LLM battle commentary are not included.

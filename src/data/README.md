@@ -24,6 +24,7 @@ projection (`CRS.EPSG4326`). It fetches the local GeoJSON once, with loading,
 failure and retry states. It does not fetch map tiles or use an API key.
 All flags are also served locally. No runtime external requests are required.
 
-This milestone only creates and views a game in React memory. Refreshing resets
-it. Opening New game retains the current game until a replacement is created;
-Return to current game cancels setup. No battle or NPC-turn controls are exposed.
+Games run locally in React memory. Refreshing resets them. Opening New game
+pauses NPC playback and retains the current game until a replacement is created;
+Return to current game cancels setup. See `../game/README.md` for human controls,
+NPC playback, and the presentation guide.

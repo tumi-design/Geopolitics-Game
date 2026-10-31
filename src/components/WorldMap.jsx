@@ -80,7 +80,7 @@ export default function WorldMap({ countries, selectedId, onSelect, game }) {
       {data && !error && <MapContainer crs={CRS.EPSG4326} bounds={WORLD_BOUNDS} maxBounds={[[-85, -190], [88, 190]]}
         minZoom={-2} maxZoom={5} zoomSnap={0} zoomDelta={0.5} scrollWheelZoom={false}
         zoomAnimation={false} fadeAnimation={false} attributionControl={false}>
-        <GeoJSON key={`${selectedId}-${countries.map((country) => `${country.id}:${country.ownerId ?? ''}`).join(',')}`}
+        <GeoJSON key={`${selectedId}-${countries.map((country) => `${country.id}:${country.ownerId ?? ''}:${country.soldiers ?? ''}`).join(',')}`}
           data={data} style={countryStyle} onEachFeature={attachCountry} />
         <MapControls />
       </MapContainer>}

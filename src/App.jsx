@@ -5,11 +5,18 @@ import GameSetup from './components/GameSetup.jsx';
 import CountryList from './components/CountryList.jsx';
 import CountryDetails from './components/CountryDetails.jsx';
 import WorldMap from './components/WorldMap.jsx';
+import TurnControls from './components/TurnControls.jsx';
+import PlaybackControls from './components/PlaybackControls.jsx';
+import GameActivity from './components/GameActivity.jsx';
+import useGameSession from './hooks/useGameSession.js';
+import { getSessionStatus } from './game/gameSession.js';
 import './App.css';
+import './components/gameplay.css';
 
 export default function App() {
-  const [game, setGame] = useState(null);
   const [settingUp, setSettingUp] = useState(true);
+  const session = useGameSession(!settingUp);
+  const { game } = session;
   const [startingId, setStartingId] = useState('710');
   const [inspectedId, setInspectedId] = useState('710');
   const [error, setError] = useState('');
@@ -19,6 +26,7 @@ export default function App() {
   const selectedCountry = displayedCountries.find((country) => country.id === selectedId);
   const owner = displayedGame?.players.find((player) => player.id === selectedCountry?.ownerId);
   const activePlayer = displayedGame?.players.find((player) => player.id === displayedGame.currentPlayerId);
+  const status = getSessionStatus(game);
 
   function selectCountry(id) {
     if (settingUp) setStartingId(id);
@@ -27,7 +35,7 @@ export default function App() {
   function createGame() {
     try {
       const next = createInitialGame(countries, startingId);
-      setGame(next);
+      session.replaceGame(next);
       setInspectedId(startingId);
       setSettingUp(false);
       setError('');
@@ -54,8 +62,8 @@ export default function App() {
       <div className="overview-strip" aria-live="polite">
         <div><span className="strip-label">{displayedGame ? 'ROUND' : 'GAMEPLAY'}</span><strong>{displayedGame ? String(game.round).padStart(2, '0') : 'Single player'}</strong></div>
         <div><span className="strip-label">{displayedGame ? 'ACTIVE PLAYER' : 'THE WORLD'}</span><strong>{activePlayer?.name ?? '10 countries'}</strong></div>
-        <div><span className="strip-label">{displayedGame ? 'YOUR COUNTRY' : 'OPPONENTS'}</span><strong>{displayedGame ? game.countries.find((country) => country.ownerId === 'human-player')?.name : '9 strategic NPCs'}</strong></div>
-        <span className="milestone-label">{displayedGame ? 'Viewing only · turn controls coming later' : 'Setup & exploration'}</span>
+        <div><span className="strip-label">{displayedGame ? 'YOUR COUNTRY' : 'OPPONENTS'}</span><strong>{displayedGame ? game.countries.find((country) => country.ownerId === 'human-player')?.name ?? 'Eliminated' : '9 strategic NPCs'}</strong></div>
+        <span className="milestone-label">{displayedGame ? 'Local game · progress resets on refresh' : 'Setup & exploration'}</span>
       </div>
       <div className="workspace">
         {settingUp ? <GameSetup selectedId={startingId} onSelect={selectCountry} onCreate={createGame} error={error}
@@ -68,6 +76,13 @@ export default function App() {
         <WorldMap countries={displayedCountries} selectedId={selectedId} onSelect={selectCountry} game={displayedGame} />
         <CountryDetails country={selectedCountry} metadata={getCountryMetadata(selectedId)} owner={owner} game={displayedGame} />
       </div>
+      {displayedGame && <div className="gameplay-workspace">
+        <PlaybackControls game={game} status={status} paused={session.paused} setPaused={session.setPaused}
+          speed={session.speed} setSpeed={session.setSpeed} error={session.error} clearError={session.clearError} />
+        <TurnControls key={`${game.round}-${game.currentPlayerId}`} game={game} status={status}
+          inspectedId={inspectedId} onAction={session.act} />
+        <GameActivity game={game} />
+      </div>}
       <div className="development-note"><span className="note-icon" aria-hidden="true">i</span><p><strong>Development data.</strong> The 31-country catalogue uses placeholder populations of 10 million for every country. Real population data will be verified before gameplay release.</p></div>
     </main>
     <footer className="site-footer"><span>UCT INF4001N <span className="footer-divider">/</span> BCOM HONS IS 2027</span><span>Explore thoughtfully. Think globally.</span></footer>
