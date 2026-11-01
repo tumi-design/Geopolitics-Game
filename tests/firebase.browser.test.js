@@ -217,12 +217,12 @@ describe('Authentication, saved games and spectators in the browser', { skip: !b
       return id;
     });
     const text = 'Test fixture only: saved commentary appears beside the actual result.';
-    async function publish(state, body = '') {
+    async function publish(state, body = '', eventId = 3) {
       // Emulator-only administrative fixture; never used by application code.
-      const record = { eventId: 3, state, text: body, model: 'test-only', factsHash: 'fixture', attempts: 1,
+      const record = { eventId, state, text: body, model: 'test-only', factsHash: 'fixture', attempts: 1,
         createdAt: Date.now(), updatedAt: Date.now(), retryAfter: Date.now() - 1 };
       const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, typeof value === 'string' ? { stringValue: value } : { integerValue: String(value) }]));
-      const result = await fetch(`http://127.0.0.1:8080/v1/projects/demo-uct-inf4001n/databases/(default)/documents/games/${id}/commentary/3`, {
+      const result = await fetch(`http://127.0.0.1:8080/v1/projects/demo-uct-inf4001n/databases/(default)/documents/games/${id}/commentary/${eventId}`, {
         method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }),
       });
       assert.equal(result.ok, true);
@@ -234,6 +234,9 @@ describe('Authentication, saved games and spectators in the browser', { skip: !b
       await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'commentary-unavailable' }) });
     });
     await page.goto(`${base}?game=${id}`); await ready();
+    const panel = page.getByRole('region', { name: 'Gemini Commentary', exact: true });
+    assert.equal(await page.locator('.live-panel .battle-commentary').count(), 0);
+    assert.equal(await panel.evaluate((element) => element.previousElementSibling.classList.contains('live-panel')), true);
     await page.getByLabel('Gemini battle commentary').first().getByText(text).waitFor();
     const before = await savedPosition();
     await page.reload(); await ready();
@@ -250,7 +253,144 @@ describe('Authentication, saved games and spectators in the browser', { skip: !b
     assert.deepEqual((await savedPosition()).game, before.game);
     await publish('ready', `${text} Updated live.`);
     await watching.getByLabel('Gemini battle commentary').first().getByText(`${text} Updated live.`).waitFor();
+    // Browse saved history without generating, even when unrelated async saved
+    // results arrive. Missing battle metadata must not hide saved prose.
+    await publish('ready', 'Older saved fixture.', 2);
+    await panel.getByLabel('Commentary history').selectOption('3');
+    await publish('ready', 'Newest saved fixture.', 6);
+    await panel.getByText(`${text} Updated live.`, { exact: true }).waitFor();
+    assert.equal(await panel.getByText('Newest saved fixture.', { exact: true }).count(), 0);
+    await panel.getByRole('button', { name: 'Return to latest saved commentary' }).click();
+    await panel.getByText('Newest saved fixture.', { exact: true }).waitFor();
+    await page.reload(); await ready();
+    await panel.getByText('Newest saved fixture.', { exact: true }).waitFor();
+    await panel.getByLabel('Commentary history').selectOption('2');
+    await panel.getByText('Older saved fixture.', { exact: true }).waitFor();
+    const removed = await fetch(`http://127.0.0.1:8080/v1/projects/demo-uct-inf4001n/databases/(default)/documents/games/${id}/commentary/2`, {
+      method: 'DELETE', headers: { Authorization: 'Bearer owner' },
+    });
+    assert.equal(removed.ok, true);
+    await panel.getByText(/This saved commentary entry is no longer available/).waitFor();
+    await panel.getByRole('button', { name: 'Return to latest saved commentary' }).click();
+    await panel.getByText('Newest saved fixture.', { exact: true }).waitFor();
+    const spectatorPanel = watching.getByRole('region', { name: 'Gemini Commentary', exact: true });
+    await spectatorPanel.getByLabel('Commentary history').selectOption('3');
+    await spectatorPanel.getByText(`${text} Updated live.`, { exact: true }).waitFor();
+    assert.equal(await spectatorPanel.getByRole('button', { name: /Generate commentary|Retry commentary/ }).count(), 0);
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+    assert.equal(requests, 1, 'Browsing, refreshing and saved updates must not generate commentary.');
     await watchingContext.close();
     await page.unroute('**/api/battle-commentary');
+  });
+
+  test('empty history, game switches and restoring a missing result never generate automatically', { timeout: 30_000 }, async () => {
+    const previousId = new URL(page.url()).searchParams.get('game');
+    const panel = page.getByRole('region', { name: 'Gemini Commentary', exact: true });
+    await panel.getByLabel('Commentary history').selectOption('3');
+    let requests = 0;
+    await page.route('**/api/battle-commentary', (route) => {
+      requests++;
+      return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'setup-required' }) });
+    });
+    const id = await page.evaluate(async () => {
+      const { auth } = await import('/src/services/firebase.js');
+      const { gameRepository } = await import('/src/services/gameRepository.js');
+      const { createInitialGame } = await import('/src/engine/gameState.js');
+      const { countries } = await import('/src/data/countries.js');
+      const game = createInitialGame(countries, '710', () => 0.5);
+      game.turnOrder = game.players.map((player) => player.id); game.turnIndex = 0; game.currentPlayerId = 'human-player';
+      return gameRepository.create(auth.currentUser.uid, game);
+    });
+    // Opening a different saved game in the same mounted interface clears the
+    // previous game's reading selection and text.
+    await page.locator('.saved-open').first().click(); await ready();
+    assert.equal(new URL(page.url()).searchParams.get('game'), id);
+    await panel.getByText(/No saved Gemini commentary yet/).waitFor();
+    assert.equal(await panel.getByLabel('Commentary history').inputValue(), '');
+    assert.equal(await panel.getByRole('button', { name: /Generate commentary|Retry commentary/ }).count(), 0);
+    for (const eventId of [3, 6]) {
+      const removed = await fetch(`http://127.0.0.1:8080/v1/projects/demo-uct-inf4001n/databases/(default)/documents/games/${previousId}/commentary/${eventId}`, {
+        method: 'DELETE', headers: { Authorization: 'Bearer owner' },
+      });
+      assert.equal(removed.ok, true);
+    }
+    await page.goto(`${base}?game=${previousId}`); await ready();
+    await panel.getByRole('button', { name: 'Generate commentary', exact: true }).waitFor();
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+    assert.equal(requests, 0, 'Restoring a completed battle without saved commentary requires an explicit owner request.');
+    await page.unroute('**/api/battle-commentary');
+  });
+  test('pinned commentary survives successive engine battles and latest mode follows subsequent saves', { timeout: 30_000 }, async () => {
+    const id = await page.evaluate(async () => {
+      const { auth } = await import('/src/services/firebase.js');
+      const { gameRepository } = await import('/src/services/gameRepository.js');
+      const { createInitialGame } = await import('/src/engine/gameState.js');
+      const { countries } = await import('/src/data/countries.js');
+      const game = createInitialGame(countries, '710', () => 0.5);
+      game.turnOrder = game.players.map((player) => player.id); game.turnIndex = 0; game.currentPlayerId = 'human-player';
+      game.countries = game.countries.map((country) => ({ ...country, soldiers: 4 }));
+      const id = await gameRepository.create(auth.currentUser.uid, game);
+      const revision = await gameRepository.update(id, auth.currentUser.uid, 0, crypto.randomUUID(), { isShared: true });
+      window.commentaryFixture = { id, game, revision };
+      return id;
+    });
+    async function advance(type) {
+      return page.evaluate(async (type) => {
+        const { auth } = await import('/src/services/firebase.js');
+        const { gameRepository } = await import('/src/services/gameRepository.js');
+        const { startAttack, stopAttack } = await import('/src/engine/gameEngine.js');
+        const fixture = window.commentaryFixture;
+        const player = fixture.game.currentPlayerId;
+        const source = fixture.game.countries.find((country) => country.ownerId === player);
+        const target = fixture.game.countries.find((country) => country.ownerId !== player);
+        fixture.game = type === 'start' ? startAttack(fixture.game, player, source.id, target.id) : stopAttack(fixture.game, player);
+        fixture.revision = await gameRepository.update(fixture.id, auth.currentUser.uid, fixture.revision, crypto.randomUUID(), { game: fixture.game });
+        return fixture.game.battleLog.at(-1).id;
+      }, type);
+    }
+    async function publish(eventId, text) {
+      const record = { eventId, state: 'ready', text, model: 'test-only', attempts: 1, retryAfter: 0 };
+      const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, typeof value === 'string' ? { stringValue: value } : { integerValue: String(value) }]));
+      const result = await fetch(`http://127.0.0.1:8080/v1/projects/demo-uct-inf4001n/databases/(default)/documents/games/${id}/commentary/${eventId}`, {
+        method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }),
+      });
+      assert.equal(result.ok, true);
+    }
+    await advance('start'); const first = await advance('stop');
+    await publish(first, 'First battle fixture.');
+    // A spectator has no local NPC runner: the fixture advances real engine
+    // actions individually, with each revision delivered by Firestore.
+    const readingContext = await browser.newContext(); const reading = await readingContext.newPage();
+    let requests = 0;
+    await reading.route('**/api/battle-commentary', (route) => {
+      requests++;
+      return route.fulfill({ status: 503, body: '{}' });
+    });
+    try {
+      await reading.goto(`${base}?game=${id}`);
+      const panel = reading.getByRole('region', { name: 'Gemini Commentary', exact: true });
+      await panel.getByText('First battle fixture.', { exact: true }).waitFor();
+      await panel.getByLabel('Commentary history').selectOption(String(first));
+      await advance('start');
+      await reading.locator('.live-panel').getByText(/attacks .* soldiers/).waitFor();
+      await panel.getByText('First battle fixture.', { exact: true }).waitFor();
+      const second = await advance('stop');
+      await reading.locator('.live-panel').getByText(/Attack on .* stopped/).waitFor();
+      await publish(second, 'Second battle fixture.');
+      await panel.getByLabel('Commentary history').locator(`option[value="${second}"]`).waitFor({ state: 'attached' });
+      assert.equal(await panel.getByLabel('Commentary history').inputValue(), String(first));
+      assert.equal(await panel.getByText('Second battle fixture.', { exact: true }).count(), 0);
+      await panel.getByRole('button', { name: 'Return to latest saved commentary' }).click();
+      await panel.getByText('Second battle fixture.', { exact: true }).waitFor();
+      await advance('start'); const third = await advance('stop');
+      await publish(third, 'Third battle fixture.');
+      await panel.getByText('Third battle fixture.', { exact: true }).waitFor();
+      assert.equal(await panel.getByLabel('Commentary history').inputValue(), '');
+      await reading.reload();
+      await panel.getByText('Third battle fixture.', { exact: true }).waitFor();
+      await panel.getByLabel('Commentary history').selectOption(String(first));
+      await panel.getByText('First battle fixture.', { exact: true }).waitFor();
+      assert.equal(requests, 0);
+    } finally { await readingContext.close(); }
   });
 });

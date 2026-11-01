@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { getLiveActivity } from './liveActivity.js';
 import { commentaryEventForActivity } from '../game/commentaryEvents.js';
 import useBattleCommentary from '../hooks/useBattleCommentary.js';
 import BattleCommentary from './BattleCommentary.jsx';
+import GeminiCommentaryPanel from './GeminiCommentaryPanel.jsx';
 
 function countryName(game, id) {
   return game.countries.find((country) => country.id === id)?.name ?? id;
@@ -43,7 +45,11 @@ export default function GameActivity({ game, gameId, user, owner = false, speed 
   const activity = getLiveActivity(game);
   const { event, combat, outcomes, decision, decisionIsCurrent } = activity;
   const commentaryEvent = commentaryEventForActivity(activity);
-  const commentary = useBattleCommentary({ gameId, user, owner, eventId: commentaryEvent?.id, speed });
+  const [selection, setSelection] = useState(null);
+  const identity = `${gameId}:${user?.uid ?? 'spectator'}`;
+  const selectedId = selection?.identity === identity ? selection.id : null;
+  const commentary = useBattleCommentary({ gameId, user, owner, eventId: commentaryEvent?.id,
+    displayEventId: selectedId ?? commentaryEvent?.id, speed });
   const decisionTitles = { reinforce: 'Reinforcements allocated', transfer: 'Soldiers transferred', skip: 'Turn skipped' };
   return <>
     <section className="panel live-panel" aria-labelledby="live-title">
@@ -63,10 +69,12 @@ export default function GameActivity({ game, gameId, user, owner = false, speed 
           <p className="event-context">Round {decision.round} · {playerName(game, decision.playerId)}</p>
           <h3 className="live-matchup">{decisionTitles[decision.type] ?? 'NPC action'}</h3>
         </> : <p>No gameplay events yet. Choose a move when your turn arrives.</p>}
-        {commentaryEvent && <BattleCommentary commentary={commentary} owner={owner} />}
         {decision && <div className="latest-decision"><span className="eyebrow">{decisionIsCurrent ? 'NPC DECISION' : 'PREVIOUS NPC DECISION'} · {playerName(game, decision.playerId)}</span><p>{decision.reason}</p></div>}
       </div>
     </section>
+    <GeminiCommentaryPanel game={game} commentary={commentary} owner={owner}
+      eventId={commentaryEvent?.id} selectedId={selectedId}
+      onSelect={(id) => setSelection({ identity, id })} />
     <div className="history-columns">
       <details className="panel history-panel"><summary><span>Battle history <span className="count-badge">{game.battleLog.length}</span></span><span className="history-hint">Expand / collapse</span></summary>
         <p className="history-description">Newest first · every phase is retained</p>

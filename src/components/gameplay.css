@@ -41,6 +41,13 @@
 .battle-commentary { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; }
 .battle-commentary .eyebrow { color: var(--champagne); }
 .battle-commentary .text-button { padding-left: 0; font-size: 11px; }
+.commentary-panel { min-width: 0; }
+.commentary-content { padding: 0 22px 22px; overflow-wrap: anywhere; }
+.commentary-content p { font-size: 12px; line-height: 1.8; }
+.commentary-navigation { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 20px; }
+.commentary-navigation .action-field { flex: 1 1 280px; margin-top: 0; }
+.commentary-navigation .text-button { font-size: 11px; padding-left: 0; }
+.commentary-current { margin-top: 18px; }
 .dice-results { margin-top: 12px; }
 .dice-pairs { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 .dice-pairs li { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 6px; padding: 8px; color: var(--muted); font-size: 10px; }
