@@ -1,5 +1,10 @@
 # React + Vite
 
+Dynamic server-side battle commentary is documented in
+[GEMINI_COMMENTARY.md](./GEMINI_COMMENTARY.md), including exact PowerShell
+instructions for the API + Vite setup, secure Firebase writer configuration,
+real Gemini testing and future Vercel environment variables.
+
 For this game's account, cloud-save and spectator setup, see
 [FIREBASE_SETUP.md](./FIREBASE_SETUP.md). Production Firestore rules must be
 deployed explicitly before using cloud saves with the real Firebase project.

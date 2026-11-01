@@ -8,6 +8,9 @@
     "test:firebase": "firebase emulators:exec --project demo-uct-inf4001n --only auth,firestore \"node --test tests/firebase.integration.test.js\"",
     "test:browser": "node --test tests/firebase.browser.test.js",
     "dev": "vite",
+    "dev:api": "node --dns-result-order=ipv4first scripts/dev-api.mjs",
+    "check:gemini": "node --dns-result-order=ipv4first scripts/check-gemini.mjs",
+    "setup:commentary-emulator": "node scripts/setup-commentary-emulator.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -18,6 +21,7 @@
     }
   },
   "dependencies": {
+    "@google/genai": "^2.32.0",
     "firebase": "^13.1.0",
     "leaflet": "^1.9.4",
     "react": "^19.3.1",

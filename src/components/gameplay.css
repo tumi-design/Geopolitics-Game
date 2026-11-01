@@ -38,6 +38,9 @@
 .live-update { padding: 0 22px 22px; min-width: 0; }
 .live-update p, .history-list p { font-size: 12px; color: var(--muted); line-height: 1.8; margin: 8px 0; }
 .latest-decision { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+.battle-commentary { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; }
+.battle-commentary .eyebrow { color: var(--champagne); }
+.battle-commentary .text-button { padding-left: 0; font-size: 11px; }
 .dice-results { margin-top: 12px; }
 .dice-pairs { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 .dice-pairs li { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 6px; padding: 8px; color: var(--muted); font-size: 10px; }

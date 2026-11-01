@@ -209,12 +209,11 @@ tabs add reads. Inspect Firestore → Usage: the free quota is finite and long
 4× playback sessions can consume it. Quota errors pause gameplay and preserve
 the pending candidate; they do not discard history or weaken rules.
 
-Still to do outside this task: deploy/verify these rules in the real project,
-perform the real-project acceptance checks, implement the required LLM battle
-commentary separately with server-side credentials and failure isolation,
-deploy/test the website, and complete the UCT submission documentation,
-assessor access and source archive. Hosting and LLM commentary are intentionally
-not implemented here.
+Still to do: deploy/verify the latest rules in the real project, perform
+real-project acceptance checks, deploy/test the website, and complete the UCT
+submission documentation, assessor access and source archive. Gemini battle
+commentary is now implemented separately; see `GEMINI_COMMENTARY.md` for its
+server-only credentials, restricted writer configuration and local tests.
 
 References: [Firebase transactions](https://firebase.google.com/docs/firestore/manage-data/transactions),
 [rules testing](https://firebase.google.com/docs/rules/unit-tests),

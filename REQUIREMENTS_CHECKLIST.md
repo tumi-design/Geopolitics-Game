@@ -35,9 +35,13 @@ Status key:
 
 ## C. AI requirements
 
-- [ ] Integrate an LLM/AI to generate dynamic battle commentary.
-- [ ] Keep AI commentary separate from the game rules.
-- [ ] Verify that AI failures do not corrupt the game state.
+- [x] Integrate an LLM/AI to generate dynamic battle commentary.
+- [x] Keep AI commentary separate from the game rules.
+- [x] Verify that AI failures do not corrupt the game state.
+
+Verified locally with Gemini, demo Firestore and browser tests. Production
+writer configuration, rules deployment and Vercel setup remain manual;
+see `GEMINI_COMMENTARY.md`.
 
 ## D. Accounts and access control
 

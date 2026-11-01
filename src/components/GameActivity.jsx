@@ -1,4 +1,7 @@
 import { getLiveActivity } from './liveActivity.js';
+import { commentaryEventForActivity } from '../game/commentaryEvents.js';
+import useBattleCommentary from '../hooks/useBattleCommentary.js';
+import BattleCommentary from './BattleCommentary.jsx';
 
 function countryName(game, id) {
   return game.countries.find((country) => country.id === id)?.name ?? id;
@@ -36,8 +39,11 @@ function BattleEvent({ game, event }) {
   }
 }
 
-export default function GameActivity({ game }) {
-  const { event, combat, outcomes, decision, decisionIsCurrent } = getLiveActivity(game);
+export default function GameActivity({ game, gameId, user, owner = false, speed = 1 }) {
+  const activity = getLiveActivity(game);
+  const { event, combat, outcomes, decision, decisionIsCurrent } = activity;
+  const commentaryEvent = commentaryEventForActivity(activity);
+  const commentary = useBattleCommentary({ gameId, user, owner, eventId: commentaryEvent?.id, speed });
   const decisionTitles = { reinforce: 'Reinforcements allocated', transfer: 'Soldiers transferred', skip: 'Turn skipped' };
   return <>
     <section className="panel live-panel" aria-labelledby="live-title">
@@ -57,6 +63,7 @@ export default function GameActivity({ game }) {
           <p className="event-context">Round {decision.round} · {playerName(game, decision.playerId)}</p>
           <h3 className="live-matchup">{decisionTitles[decision.type] ?? 'NPC action'}</h3>
         </> : <p>No gameplay events yet. Choose a move when your turn arrives.</p>}
+        {commentaryEvent && <BattleCommentary commentary={commentary} owner={owner} />}
         {decision && <div className="latest-decision"><span className="eyebrow">{decisionIsCurrent ? 'NPC DECISION' : 'PREVIOUS NPC DECISION'} · {playerName(game, decision.playerId)}</span><p>{decision.reason}</p></div>}
       </div>
     </section>
@@ -65,6 +72,7 @@ export default function GameActivity({ game }) {
         <p className="history-description">Newest first · every phase is retained</p>
         <ol className="history-list" tabIndex="0" aria-label="Battle history entries">{[...game.battleLog].reverse().map((event) => <li key={event.id}>
           <small>#{event.id} · Round {event.round} · {playerName(game, event.playerId)}</small><BattleEvent game={game} event={event} />
+          <BattleCommentary commentary={{ entry: commentary.entries[event.id] }} owner={false} compact />
         </li>)}</ol>{!game.battleLog.length && <p className="empty-result">Your battle history will appear here.</p>}
       </details>
       <details className="panel history-panel"><summary><span>NPC decision history <span className="count-badge">{game.npcDecisionLog.length}</span></span><span className="history-hint">Expand / collapse</span></summary>

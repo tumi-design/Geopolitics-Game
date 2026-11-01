@@ -10,6 +10,9 @@ describe('Authentication, saved games and spectators in the browser', { skip: !b
     const { chromium } = await import('@playwright/test');
     browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
     context = await browser.newContext(); page = await context.newPage();
+    // Regular UI tests never consume the real provider quota.
+    await page.route('**/api/battle-commentary', (route) => route.fulfill({ status: 503,
+      contentType: 'application/json', body: JSON.stringify({ code: 'setup-required' }) }));
     await page.goto(base);
     const safe = await page.evaluate(async () => {
       const { db } = await import('/src/services/firebase.js');
@@ -193,5 +196,61 @@ describe('Authentication, saved games and spectators in the browser', { skip: !b
     await page.reload(); await ready();
     assert.deepEqual((await savedPosition()).game, result.game);
     await page.getByRole('heading', { name: 'Place your reinforcements' }).waitFor();
+  });
+
+  test('saved commentary is secondary, survives refresh, streams to spectators and fails independently', { timeout: 30_000 }, async () => {
+    const id = await page.evaluate(async () => {
+      const { auth } = await import('/src/services/firebase.js');
+      const { gameRepository } = await import('/src/services/gameRepository.js');
+      const { createInitialGame } = await import('/src/engine/gameState.js');
+      const { startAttack, rollAttackPhase, completeConquest } = await import('/src/engine/gameEngine.js');
+      const { countries } = await import('/src/data/countries.js');
+      let game = createInitialGame(countries, '710', () => 0.5);
+      game.turnOrder = game.players.map((player) => player.id); game.turnIndex = 0; game.currentPlayerId = 'human-player';
+      game.countries = game.countries.map((country, index) => ({ ...country, ownerId: index === 1 ? 'npc-1' : 'human-player', soldiers: index === 1 ? 1 : 4 }));
+      const id = await gameRepository.create(auth.currentUser.uid, game);
+      game = startAttack(game, 'human-player', game.countries[0].id, game.countries[1].id);
+      let calls = 0; game = rollAttackPhase(game, 'human-player', () => calls++ % 2 === 0 ? 0.99 : 0);
+      game = completeConquest(game, 'human-player', 2);
+      await gameRepository.update(id, auth.currentUser.uid, 0, crypto.randomUUID(), { game });
+      await gameRepository.update(id, auth.currentUser.uid, 1, crypto.randomUUID(), { isShared: true });
+      return id;
+    });
+    const text = 'Test fixture only: saved commentary appears beside the actual result.';
+    async function publish(state, body = '') {
+      // Emulator-only administrative fixture; never used by application code.
+      const record = { eventId: 3, state, text: body, model: 'test-only', factsHash: 'fixture', attempts: 1,
+        createdAt: Date.now(), updatedAt: Date.now(), retryAfter: Date.now() - 1 };
+      const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, typeof value === 'string' ? { stringValue: value } : { integerValue: String(value) }]));
+      const result = await fetch(`http://127.0.0.1:8080/v1/projects/demo-uct-inf4001n/databases/(default)/documents/games/${id}/commentary/3`, {
+        method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }),
+      });
+      assert.equal(result.ok, true);
+    }
+    await publish('ready', text);
+    let requests = 0;
+    await page.route('**/api/battle-commentary', async (route) => {
+      requests++;
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'commentary-unavailable' }) });
+    });
+    await page.goto(`${base}?game=${id}`); await ready();
+    await page.getByLabel('Gemini battle commentary').first().getByText(text).waitFor();
+    const before = await savedPosition();
+    await page.reload(); await ready();
+    await page.getByLabel('Gemini battle commentary').first().getByText(text).waitFor();
+    assert.equal(requests, 0);
+    const watchingContext = await browser.newContext(); const watching = await watchingContext.newPage();
+    await watching.goto(page.url());
+    await watching.getByLabel('Gemini battle commentary').first().getByText(text).waitFor();
+    assert.equal(await watching.getByRole('button', { name: 'Generate commentary' }).count(), 0);
+    await publish('failed');
+    await page.getByRole('button', { name: 'Retry commentary', exact: true }).click();
+    await page.getByText('Gemini commentary is unavailable. The battle result is unchanged.').first().waitFor();
+    assert.equal(requests, 1);
+    assert.deepEqual((await savedPosition()).game, before.game);
+    await publish('ready', `${text} Updated live.`);
+    await watching.getByLabel('Gemini battle commentary').first().getByText(`${text} Updated live.`).waitFor();
+    await watchingContext.close();
+    await page.unroute('**/api/battle-commentary');
   });
 });

@@ -108,4 +108,8 @@ owner can edit. Rules are tracked in `firestore.rules`, but production deploymen
 and real-project acceptance checks remain manual. See `FIREBASE_SETUP.md` for
 the schema, emulator tests, deployment commands and limitations.
 
-LLM commentary, website deployment and assignment submission remain outstanding.
+Gemini battle commentary now uses `api/battle-commentary.js` with server helpers
+in `server/`. A dedicated restricted Auth writer persists commentary in its own
+subcollection, independently of engine saves. See `GEMINI_COMMENTARY.md` for
+authorization, quotas, local setup and remaining manual production steps.
+Website deployment and assignment submission remain outstanding.

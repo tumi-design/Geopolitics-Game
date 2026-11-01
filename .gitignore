@@ -32,3 +32,4 @@ dist-ssr
 *-debug.log
 playwright-report/
 test-results/
+.vercel/

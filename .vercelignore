@@ -1,0 +1,7 @@
+.env*
+!.env.example
+.firebase/
+test-results/
+playwright-report/
+*-debug.log
+docs/*.pdf

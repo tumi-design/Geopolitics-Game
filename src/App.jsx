@@ -95,7 +95,8 @@ export default function App() {
         <TurnControls key={`${game.round}-${game.currentPlayerId}`} game={game} status={status}
           inspectedId={inspectedId} onAction={session.act} />
         </fieldset></>}
-        <GameActivity game={game} />
+        <GameActivity game={game} gameId={session.id} user={account.user} speed={session.speed}
+          owner={Boolean(account.user && session.metadata?.ownerUid === account.user.uid && !account.busy)} />
       </div>}
       <div className="development-note"><span className="note-icon" aria-hidden="true">i</span><p><strong>Population reference.</strong> The {countries.length}-country catalogue uses <a href={populationReference.sourceUrl} target="_blank" rel="noreferrer">Worldometer {populationReference.year}</a> annual estimates. Starting soldiers follow the UCT population thresholds.</p></div>
     </main>

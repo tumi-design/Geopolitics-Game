@@ -115,7 +115,7 @@ export function createGameRepository(database) {
     const saved = (await getDoc(gameRef(id))).data();
     if (!saved || saved.ownerUid !== uid) throw codedError('permission-denied', 'Only your own games can be deleted.');
     if (!saved.deleting) await update(id, uid, revision, crypto.randomUUID(), { deleting: true });
-    for (const name of ['battles', 'decisions']) {
+    for (const name of ['battles', 'decisions', 'commentary']) {
       let snapshot;
       do {
         snapshot = await getDocs(query(collection(gameRef(id), name), limit(200)));

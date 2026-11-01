@@ -1,0 +1,4 @@
+{
+  "framework": "vite",
+  "functions": { "api/battle-commentary.js": { "maxDuration": 60 } }
+}

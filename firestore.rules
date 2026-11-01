@@ -2,6 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function commentaryServer() {
+      return signedIn() && exists(/databases/$(database)/documents/serverConfig/commentary)
+        && request.auth.uid == get(/databases/$(database)/documents/serverConfig/commentary).data.writerUid;
+    }
     function owner(data) { return signedIn() && data.ownerUid == request.auth.uid; }
     function readable(data) { return owner(data) || (data.isShared == true && data.deleting == false); }
     function valid(data) {
@@ -32,6 +36,20 @@ service cloud.firestore {
         && request.resource.data.decisionCount >= resource.data.decisionCount
         && (!request.resource.data.deleting || !request.resource.data.isShared);
       allow delete: if owner(resource.data) && resource.data.deleting == true;
+      match /commentary/{eventId} {
+        function game() { return get(/databases/$(database)/documents/games/$(gameId)).data; }
+        allow read: if commentaryServer() || readable(game());
+        allow create, update: if commentaryServer() && game().deleting == false
+          && request.resource.data.keys().hasOnly(['eventId', 'state', 'text', 'model', 'factsHash', 'attempts', 'createdAt', 'updatedAt', 'retryAfter'])
+          && request.resource.data.eventId == int(eventId)
+          && request.resource.data.eventId > 0 && request.resource.data.eventId <= game().battleCount
+          && request.resource.data.state in ['pending', 'ready', 'failed']
+          && request.resource.data.text is string && request.resource.data.text.size() <= 1000
+          && request.resource.data.model is string && request.resource.data.factsHash is string
+          && request.resource.data.attempts is int && request.resource.data.attempts >= 1 && request.resource.data.attempts <= 2
+          && request.resource.data.createdAt is int && request.resource.data.updatedAt is int && request.resource.data.retryAfter is int;
+        allow delete: if owner(game()) && game().deleting == true;
+      }
       match /{history}/{eventId} {
         function parent() { return get(/databases/$(database)/documents/games/$(gameId)).data; }
         function nextParent() { return getAfter(/databases/$(database)/documents/games/$(gameId)).data; }
@@ -47,6 +65,12 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if history in ['battles', 'decisions'] && owner(parent()) && parent().deleting == true;
       }
+    }
+    // Only a Console administrator can create/change this UID configuration.
+    match /serverConfig/{document} { allow read, write: if false; }
+    match /commentaryQuota/{id} {
+      allow read, create, update: if commentaryServer();
+      allow delete: if false;
     }
   }
 }

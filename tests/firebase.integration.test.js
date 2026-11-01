@@ -8,6 +8,9 @@ import { createInitialGame } from '../src/engine/gameState.js';
 import { countries } from '../src/data/countries.js';
 import { advanceNpcPlayback } from '../src/game/gameSession.js';
 import { skipTurn, startAttack, rollAttackPhase } from '../src/engine/gameEngine.js';
+import { createFirebaseRest } from '../server/firebaseRest.js';
+import { createCommentaryStore } from '../server/commentaryStore.js';
+import { createCommentaryHandler } from '../server/commentaryHandler.js';
 
 // A demo project ID prevents these tests from contacting production services.
 describe('Firestore rules and complete saved games (local emulator)', { skip: !process.env.FIRESTORE_EMULATOR_HOST }, () => {
@@ -139,5 +142,67 @@ describe('Firestore rules and complete saved games (local emulator)', { skip: !p
       for (const name of ['battles', 'decisions']) assert.equal((await getDocs(collection(context.firestore(), 'games', id, name))).size, 0);
     });
     assert.deepEqual((await loaded(owner, other)).game, initial);
+  });
+
+  test('only the configured commentary writer can write AI records; sharing never grants writes', async () => {
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'serverConfig', 'commentary'), { writerUid: 'commentary-writer' });
+    });
+    const initial = game();
+    const id = await owner.create('owner', initial);
+    const next = startAttack(initial, 'human-player', initial.countries[0].id, initial.countries[1].id);
+    await owner.update(id, 'owner', 0, 'commentary-attack', { game: next });
+    const record = { eventId: 1, state: 'ready', text: 'Server-generated test fixture.', model: 'test-only', factsHash: 'hash', attempts: 1, createdAt: 1, updatedAt: 1, retryAfter: 1 };
+    await assertFails(setDoc(doc(ownerDb, 'games', id, 'commentary', '1'), record));
+    await assertFails(setDoc(doc(visitorDb, 'games', id, 'commentary', '1'), record));
+    await assertFails(setDoc(doc(ownerDb, 'serverConfig', 'commentary'), { writerUid: 'owner' }));
+    await assertFails(getDoc(doc(ownerDb, 'commentaryQuota', 'global')));
+    const writer = environment.authenticatedContext('commentary-writer').firestore();
+    await assertSucceeds(setDoc(doc(writer, 'games', id, 'commentary', '1'), record));
+    await assertFails(updateDoc(doc(writer, 'games', id), { isShared: true }));
+    await assertSucceeds(getDoc(doc(ownerDb, 'games', id, 'commentary', '1')));
+    await assertFails(getDoc(doc(publicDb, 'games', id, 'commentary', '1')));
+    await owner.update(id, 'owner', 1, 'share-commentary', { isShared: true });
+    await assertSucceeds(getDoc(doc(publicDb, 'games', id, 'commentary', '1')));
+    await assertFails(updateDoc(doc(publicDb, 'games', id, 'commentary', '1'), { text: 'Forged' }));
+    await owner.remove(id, 'owner', 2);
+    await environment.withSecurityRulesDisabled(async (context) => {
+      assert.equal((await getDocs(collection(context.firestore(), 'games', id, 'commentary'))).size, 0);
+    });
+  });
+
+  test('server REST authentication, atomic quota lease and commentary persistence work end to end', async () => {
+    async function signup(label) {
+      const email = `${label}-${Date.now()}@example.com`; const password = 'EmulatorOnly123!';
+      const result = await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-key', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, returnSecureToken: true }),
+      });
+      const user = await result.json(); assert.ok(user.idToken);
+      return { ...user, email, password };
+    }
+    const player = await signup('commentary-owner'); const writer = await signup('server-writer');
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'serverConfig', 'commentary'), { writerUid: writer.localId });
+    });
+    const ownRepository = createGameRepository(environment.authenticatedContext(player.localId).firestore());
+    const initial = game(); const id = await ownRepository.create(player.localId, initial);
+    let state = startAttack(initial, 'human-player', initial.countries[0].id, initial.countries[1].id);
+    const { stopAttack } = await import('../src/engine/gameEngine.js');
+    state = stopAttack(state, 'human-player');
+    await ownRepository.update(id, player.localId, 0, 'stop-for-commentary', { game: state });
+    const firebase = createFirebaseRest({ FIREBASE_PROJECT_ID: 'demo-uct-inf4001n', FIREBASE_WEB_API_KEY: 'demo-key', COMMENTARY_USE_EMULATORS: 'true',
+      COMMENTARY_WRITER_EMAIL: writer.email, COMMENTARY_WRITER_PASSWORD: writer.password, COMMENTARY_WRITER_UID: writer.localId });
+    let calls = 0;
+    const handler = createCommentaryHandler({ firebase, store: createCommentaryStore(firebase), generate: async () => {
+      calls++; return { text: 'Clearly labelled test fixture, not a real Gemini response.', model: 'test-only' };
+    } });
+    const req = { method: 'POST', headers: { authorization: `Bearer ${player.idToken}`, 'content-type': 'application/json', host: 'localhost' }, body: { gameId: id, eventId: 2 } };
+    function response() { return { setHeader() {}, status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; } }; }
+    const first = response(); await handler(req, first); assert.equal(first.statusCode, 200);
+    const duplicate = response(); await handler(req, duplicate); assert.equal(duplicate.statusCode, 200); assert.equal(calls, 1);
+    const saved = await getDoc(doc(environment.authenticatedContext(player.localId).firestore(), 'games', id, 'commentary', '2'));
+    assert.equal(saved.data().state, 'ready');
+    assert.deepEqual((await loaded(ownRepository, id)).game, state);
+    const anonymous = response(); await handler({ ...req, headers: {} }, anonymous); assert.equal(anonymous.statusCode, 401);
   });
 });
