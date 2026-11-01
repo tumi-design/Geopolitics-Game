@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function owner(data) { return signedIn() && data.ownerUid == request.auth.uid; }
+    function readable(data) { return owner(data) || (data.isShared == true && data.deleting == false); }
+    function valid(data) {
+      return data.keys().hasOnly(['schemaVersion', 'ownerUid', 'title', 'isShared', 'deleting', 'revision', 'createdAt', 'updatedAt', 'lastMutationId', 'core', 'battleCount', 'decisionCount'])
+        && data.schemaVersion == 1 && data.ownerUid is string
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 160
+        && data.isShared is bool && data.deleting is bool
+        && data.revision is int && data.revision >= 0
+        && data.core is string && data.core.size() <= 700000
+        && data.battleCount is int && data.battleCount >= 0
+        && data.decisionCount is int && data.decisionCount >= 0
+        && data.lastMutationId is string && data.lastMutationId.size() <= 80
+        && data.createdAt is timestamp && data.updatedAt == request.time;
+    }
+    match /games/{gameId} {
+      allow get, list: if readable(resource.data);
+      allow create: if valid(request.resource.data) && owner(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.revision == 0 && request.resource.data.isShared == false
+        && request.resource.data.deleting == false
+        && request.resource.data.battleCount == 0 && request.resource.data.decisionCount == 0;
+      allow update: if owner(resource.data) && resource.data.deleting == false
+        && valid(request.resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.revision == resource.data.revision + 1
+        && request.resource.data.battleCount >= resource.data.battleCount
+        && request.resource.data.decisionCount >= resource.data.decisionCount
+        && (!request.resource.data.deleting || !request.resource.data.isShared);
+      allow delete: if owner(resource.data) && resource.data.deleting == true;
+      match /{history}/{eventId} {
+        function parent() { return get(/databases/$(database)/documents/games/$(gameId)).data; }
+        function nextParent() { return getAfter(/databases/$(database)/documents/games/$(gameId)).data; }
+        function count(data) { return history == 'battles' ? data.battleCount : data.decisionCount; }
+        allow read: if history in ['battles', 'decisions'] && readable(parent());
+        allow create: if history in ['battles', 'decisions'] && owner(parent())
+          && parent().deleting == false && nextParent().deleting == false
+          && nextParent().revision == parent().revision + 1
+          && request.resource.data.keys().hasOnly(['seq', 'payload'])
+          && request.resource.data.seq is int && int(eventId) == request.resource.data.seq
+          && request.resource.data.seq > count(parent()) && request.resource.data.seq <= count(nextParent())
+          && request.resource.data.payload is string && request.resource.data.payload.size() <= 700000;
+        allow update: if false;
+        allow delete: if history in ['battles', 'decisions'] && owner(parent()) && parent().deleting == true;
+      }
+    }
+  }
+}

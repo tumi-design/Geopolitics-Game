@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { countries, filterCountries, populationReference } from '../data/countries.js';
 import CountryList from './CountryList.jsx';
 
-export default function GameSetup({ selectedId, onSelect, onCreate, onCancel, error }) {
+export default function GameSetup({ selectedId, onSelect, onCreate, onCancel, error, canCreate = true, saving = false }) {
   const [query, setQuery] = useState('');
   const results = filterCountries(countries, query);
   return <section className="panel setup-panel" aria-labelledby="setup-title">
@@ -16,9 +16,9 @@ export default function GameSetup({ selectedId, onSelect, onCreate, onCancel, er
     <CountryList countries={results} selectedId={selectedId} onSelect={onSelect} />
     <div className="setup-footer">
       {error && <p className="error-message" role="alert">{error}</p>}
-      <button className="primary-button" type="button" onClick={onCreate} disabled={!selectedId}>Create new game <span aria-hidden="true">→</span></button>
+      <button className="primary-button" type="button" onClick={onCreate} disabled={!selectedId || !canCreate || saving}>{saving ? 'Creating saved game…' : 'Create new game'} <span aria-hidden="true">→</span></button>
       {onCancel && <button className="text-button" type="button" onClick={onCancel}>Return to current game</button>}
-      <p className="fine-print">Local preview · games reset on refresh</p>
+      <p className="fine-print">{canCreate ? 'Private by default · progress saved to your account' : 'Sign in to create a saved game'}</p>
     </div>
   </section>;
 }

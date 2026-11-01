@@ -94,11 +94,18 @@ NPC decisions, battle commentary and fast-forward controls.
 
 ## 8. Implementation status
 
-Current status:
-- React/Vite starter application created and running locally.
-- Git repository initialised.
-- Starter application pushed to GitHub.
-- Requirements checklist created and pushed.
+The tested engine, strategic NPCs, 55-country catalogue and playable React map
+interface are implemented. Firebase integration now lives in `src/services/`:
+`firebase.js` configures the SDK, `gameStorage.js` encodes/restores the engine
+state, and `gameRepository.js` owns Firestore queries, transactions and listeners.
+`useAuth.js` restores account sessions; `useGameSession.js` connects the existing
+engine to serialized cloud saves and step-by-step NPC playback. Account, library
+and save/sharing controls are separate React components.
 
-The game, database, authentication, AI integration and
-deployment have not yet been implemented or verified.
+Games have private owner-controlled core documents and append-only battle/NPC
+history subcollections. Shared games expose read-only live listeners; only the
+owner can edit. Rules are tracked in `firestore.rules`, but production deployment
+and real-project acceptance checks remain manual. See `FIREBASE_SETUP.md` for
+the schema, emulator tests, deployment commands and limitations.
+
+LLM commentary, website deployment and assignment submission remain outstanding.

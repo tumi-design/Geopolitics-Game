@@ -1,0 +1,8 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    { "collectionGroup": "games", "fieldPath": "core", "indexes": [] },
+    { "collectionGroup": "battles", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "decisions", "fieldPath": "payload", "indexes": [] }
+  ]
+}

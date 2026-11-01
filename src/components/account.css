@@ -1,0 +1,27 @@
+.account-panel, .saved-panel, .save-status { padding: 24px; margin-bottom: 24px; }
+.account-panel { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; justify-content: space-between; }
+.account-panel h2, .saved-panel h2 { margin: 7px 0; font-size: 1.1rem; }
+.account-panel p, .saved-panel p, .save-status p { line-height: 1.6; font-size: 12px; color: var(--muted); }
+.account-form { display: flex; gap: 14px; align-items: end; flex-wrap: wrap; }
+.account-form .action-field { flex: 1 1 170px; }
+.account-form .primary-button { width: auto; }
+.account-form .text-button { flex-basis: 100%; text-align: left; }
+.saved-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.saved-list { list-style: none; margin: 12px 0 0; padding: 0; max-height: 300px; overflow: auto; }
+.saved-list li { display: flex; align-items: center; gap: 18px; border-top: 1px solid var(--border, #34404a); padding: 12px 0; }
+.saved-open { border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; padding: 8px; flex: 1; }
+.saved-open span { display: block; font-size: .8rem; color: #b2b9b5; margin-top: 6px; line-height: 1.6; }
+.saved-open[aria-current="true"] { border-left: 2px solid #b8a58a; }
+.delete-confirm { display: flex; flex-wrap: wrap; gap: 12px; max-width: 320px; font-size: .85rem; }
+.sharing-controls { border-top: 1px solid #34404a; margin-top: 14px; padding-top: 14px; }
+.sharing-controls input[type="checkbox"] { margin-right: 8px; accent-color: #86958c; }
+.share-link { display: flex; align-items: end; gap: 16px; margin-top: 16px; }
+.share-link .action-field { flex: 1; min-width: 0; }
+.game-editing-lock { border: 0; padding: 0; margin: 0; min-width: 0; }
+.game-editing-lock:disabled { opacity: .65; }
+.account-panel button:disabled, .saved-panel button:disabled { opacity: .5; cursor: default; }
+@media (max-width: 760px) {
+  .account-form, .account-panel > div, .account-panel > form { width: 100%; }
+  .saved-list li, .share-link { align-items: stretch; flex-direction: column; gap: 8px; }
+  .account-panel, .saved-panel, .save-status { padding: 18px; }
+}

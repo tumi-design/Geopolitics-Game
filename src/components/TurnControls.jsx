@@ -36,7 +36,7 @@ function AttackForm({ owned, enemies, inspectedId, onAction, used }) {
     event.preventDefault(); onAction({ type: 'attack', sourceId, targetId });
   }}>
     <h3>Choose an attack</h3><p>One target per turn. Every enemy country is within reach.</p>
-    {attackers.length ? <CountrySelect label="Attacking country" countries={attackers} value={sourceId} onChange={setSourceChoice} />
+    {attackers.length ? <CountrySelect label="Attacking country · You" countries={attackers} value={sourceId} onChange={setSourceChoice} />
       : <p>No country has the two soldiers needed to attack.</p>}
     <CountrySelect label="Enemy target" countries={enemies} value={targetId} onChange={setTargetChoice} />
     <button className="primary-button" disabled={!sourceId || !targetId || used}>Start attack</button>
