@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, serverTimestamp } from 'firebase/firestore';
-import { createGameRepository } from '../src/services/gameRepository.js';
+import { GameRepository, createGameRepository } from '../src/services/gameRepository.js';
 import { createInitialGame } from '../src/engine/gameState.js';
 import { countries } from '../src/data/countries.js';
 import { advanceNpcPlayback } from '../src/game/gameSession.js';
@@ -45,6 +45,81 @@ describe('Firestore rules and complete saved games (local emulator)', { skip: !p
     owner = createGameRepository(ownerDb); visitor = createGameRepository(visitorDb); publicRepository = createGameRepository(publicDb);
   });
   after(async () => { await environment?.cleanup(); });
+
+  test('repository classes preserve injected permissions and detached create/update/watch/list/remove methods', async () => {
+    assert.ok(owner instanceof GameRepository);
+    const other = new GameRepository(visitorDb);
+    assert.ok(publicRepository instanceof GameRepository);
+    const { create, update, watch, watchList, remove } = owner;
+    const initial = game(); const id = await create('owner', initial);
+    const otherId = await other.create('visitor', initial);
+    const next = skipTurn(initial, 'human-player');
+    assert.equal(await update(id, 'owner', 0, 'detached-update', { game: next }), 1);
+    assert.deepEqual((await loaded({ watch }, id)).game, next);
+    await assertFails(getDoc(doc(visitorDb, 'games', id)));
+    await assertFails(getDoc(doc(ownerDb, 'games', otherId)));
+    // Adding a public lookalike cannot redirect the private database dependency.
+    owner.database = visitorDb;
+    let stopList = () => {};
+    try {
+      const list = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Detached list listener timed out.')), 15_000);
+        stopList = watchList('owner', (entries) => {
+          if (entries.some((entry) => entry.id === id)) { clearTimeout(timer); resolve(entries); }
+        }, (error) => { clearTimeout(timer); reject(error); });
+      });
+      assert.ok(list.some((entry) => entry.id === id));
+      assert.ok(!list.some((entry) => entry.id === otherId));
+      await remove(id, 'owner', 1);
+      // Missing documents are intentionally unreadable under production rules.
+      await environment.withSecurityRulesDisabled(async (context) => {
+        assert.equal((await getDoc(doc(context.firestore(), 'games', id))).exists(), false);
+      });
+    } finally { stopList(); delete owner.database; }
+  });
+
+  test('concurrent subscriptions keep independent history, state and unsubscribe behaviour', async () => {
+    const initial = game();
+    const first = await owner.create('owner', initial); const second = await owner.create('owner', initial);
+    function track(id) {
+      const records = []; const waiting = new Set();
+      const unsubscribe = owner.watch(id, (value) => {
+        if (value.fromCache) return;
+        records.push(value);
+        for (const waiter of waiting) if (value.metadata.revision >= waiter.revision) waiter.finish(null, value);
+      }, (error) => { for (const waiter of waiting) waiter.finish(error); });
+      return { records,
+        until(revision) {
+          if (records.at(-1)?.metadata.revision >= revision) return Promise.resolve(records.at(-1));
+          return new Promise((resolve, reject) => {
+            const waiter = { revision, finish(error, value) {
+              clearTimeout(timer); waiting.delete(waiter); if (error) reject(error); else resolve(value);
+            } };
+            const timer = setTimeout(() => waiter.finish(new Error('Independent subscription timed out.')), 15_000);
+            waiting.add(waiter);
+          });
+        },
+        stop() { unsubscribe(); for (const waiter of waiting) waiter.finish(new Error('Subscription stopped.')); },
+      };
+    }
+    const firstReader = track(first); const sameGameReader = track(first); const otherGameReader = track(second);
+    try {
+      await Promise.all([firstReader.until(0), sameGameReader.until(0), otherGameReader.until(0)]);
+      const next = skipTurn(initial, initial.currentPlayerId);
+      await owner.update(first, 'owner', 0, 'independent-first', { game: next });
+      await Promise.all([firstReader.until(1), sameGameReader.until(1)]);
+      assert.equal(otherGameReader.records.at(-1).metadata.revision, 0);
+      assert.deepEqual(otherGameReader.records.at(-1).game, initial);
+      firstReader.stop(); const stoppedCount = firstReader.records.length;
+      await owner.update(second, 'owner', 0, 'independent-second', { game: next });
+      await otherGameReader.until(1);
+      const later = skipTurn(next, next.currentPlayerId);
+      await owner.update(first, 'owner', 1, 'independent-later', { game: later });
+      assert.deepEqual((await sameGameReader.until(2)).game, later);
+      assert.equal(firstReader.records.length, stoppedCount);
+      assert.equal(otherGameReader.records.at(-1).metadata.revision, 1);
+    } finally { firstReader.stop(); sameGameReader.stop(); otherGameReader.stop(); }
+  });
 
   test('owners can create multiple separate private games and read their complete state', async () => {
     const initial = game();

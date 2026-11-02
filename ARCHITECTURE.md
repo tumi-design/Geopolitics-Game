@@ -94,6 +94,35 @@ NPC decisions, battle commentary and fast-forward controls.
 
 ## 8. Implementation status
 
+### Object-oriented database access
+
+`src/services/gameRepository.js` exports the `GameRepository` class. Each instance
+represents one game-storage service and receives its Firestore connection through
+`constructor(database)`. This is dependency injection: the application supplies its
+configured connection, while tests supply isolated emulator connections. A missing
+dependency fails immediately instead of failing during a later save.
+
+The connection is held in `#database`. JavaScript enforces the privacy of this
+field and the `#games()` / `#gameRef(id)` helpers: callers cannot read or replace
+them through ordinary object properties. Public methods `create`, `update`,
+`watch`, `watchList` and `remove` provide the service's interface. Their existing
+arguments, results and errors are preserved. Constructor binding lets these
+methods be passed as callbacks without losing their instance, and keeps the
+existing browser tests' temporary method replacement possible.
+
+This demonstrates a class combining private state with related behaviour, rather
+than putting gameplay functions into a cosmetic class. The previous factory
+already encapsulated its connection through a closure; the class now makes the
+repository's contract and encapsulation explicit. `createGameRepository(database)`
+still returns a configured instance, and the `gameRepository` singleton keeps
+existing React callers unchanged. Subscription state stays local inside each
+`watch()` invocation, so concurrent game listeners and their unsubscribe functions
+remain independent.
+
+Private fields organise client code; Firestore rules still enforce authorisation.
+The refactoring leaves transactions, revision checks, idempotent retries, staged
+deletion, stored data, engine rules, NPC strategy and Gemini services unchanged.
+
 The tested engine, strategic NPCs, 55-country catalogue and playable React map
 interface are implemented. Firebase integration now lives in `src/services/`:
 `firebase.js` configures the SDK, `gameStorage.js` encodes/restores the engine
