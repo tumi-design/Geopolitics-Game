@@ -12,7 +12,7 @@ export default function GeminiCommentaryPanel({ game, commentary, owner, eventId
   const label = (id) => {
     const battle = game.battleLog.find((event) => String(event.id) === String(id));
     const name = (countryId) => game.countries.find((country) => country.id === countryId)?.name ?? countryId;
-    return battle ? `#${id} · Round ${battle.round} · ${name(battle.sourceCountryId)} → ${name(battle.targetCountryId)}`
+    return battle ? `#${id} · Round ${battle.round}${battle.type === 'combat_phase' ? ` · Phase ${battle.phaseNumber}` : ''} · ${name(battle.sourceCountryId)} → ${name(battle.targetCountryId)}`
       : `#${id} · Battle details unavailable`;
   };
   const missing = selectedId !== null && !saved;
@@ -21,6 +21,7 @@ export default function GeminiCommentaryPanel({ game, commentary, owner, eventId
   const reading = saved?.state === 'ready' ? { entry: saved } : commentary;
   const showCurrentStatus = selectedId === null && latest && eventId
     && String(latest[0]) !== String(eventId) && commentary.entry?.state !== 'ready';
+  const requestStatus = commentary.requestStatus;
   return <section className="panel commentary-panel" aria-labelledby="commentary-title">
     <div className="panel-heading"><span className="eyebrow">SAVED BATTLE PERSPECTIVES</span><h2 id="commentary-title">Gemini Commentary</h2></div>
     <div className="commentary-content">
@@ -35,6 +36,12 @@ export default function GeminiCommentaryPanel({ game, commentary, owner, eventId
         <button className="text-button" type="button" disabled={selectedId === null} onClick={() => onSelect(null)}>Return to latest saved commentary</button>
       </div>
       <p className="fine-print">{history.filter(([, entry]) => entry.state === 'ready').length} saved · {selectedId === null ? 'Following latest saved commentary' : 'Selected commentary stays open as play continues'}</p>
+      {requestStatus && String(requestStatus.eventId) !== String(displayedId) &&
+        ['requesting', 'unavailable'].includes(requestStatus.state) && <p className="fine-print" role="status">
+          {requestStatus.state === 'requesting' ? `Preparing sampled commentary for event #${requestStatus.eventId}. Gameplay continues.`
+            : requestStatus.code === 'daily-limit' ? 'Automatic commentary unavailable: today’s allowance has been reached. Gameplay continues.'
+              : 'A commentary request was unavailable. Existing saved commentary and gameplay remain available.'}
+        </p>}
       {commentary.error ? <p role="status">Saved commentary is temporarily unavailable.</p>
         : commentary.loading ? <p role="status">Loading saved commentary…</p>
           : missing ? <p role="status">This saved commentary entry is no longer available. Choose another entry or return to latest.</p>

@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase.js';
 import { requestBattleCommentary } from '../services/commentaryClient.js';
+import { createCommentaryScheduler } from '../game/commentaryScheduler.js';
 
 const attempted = new Set();
 const emptyEntries = {};
-export default function useBattleCommentary({ gameId, user, owner, eventId, displayEventId = eventId, speed = 1 }) {
+export default function useBattleCommentary({ gameId, user, owner, eventId, displayEventId = eventId, battleLog }) {
   const identity = `${gameId}:${user?.uid ?? 'spectator'}`;
-  // Opening/restoring a game is not a reason to generate historical commentary.
-  const restored = useRef({ identity, eventId });
+  const scheduler = useRef(null);
+  const [schedulerStatus, setSchedulerStatus] = useState(null);
   const [snapshot, setSnapshot] = useState(null);
   const [feedback, setFeedback] = useState({});
   const [now, setNow] = useState(() => Date.now());
@@ -43,22 +44,26 @@ export default function useBattleCommentary({ gameId, user, owner, eventId, disp
     const result = await requestBattleCommentary(user, gameId, Number(id), retry);
     // Results are keyed by game, identity and event. Never touch engine state.
     setFeedback((previous) => ({ ...previous, [key]: result }));
+    return result;
   }, [owner, user, gameId, identity]);
-  const request = useCallback((retry = false) => requestEvent(displayEventId, retry), [requestEvent, displayEventId]);
+  const request = useCallback((retry = false) => scheduler.current?.manual(Number(displayEventId), retry), [displayEventId]);
 
   useEffect(() => {
-    if (restored.current.identity !== identity) {
-      restored.current = { identity, eventId };
-      return;
-    }
-    const liveKey = `${identity}:${eventId}`;
-    if (eventId === restored.current.eventId || !owner || !eventId || speed !== 1 || !view?.loaded
-      || entries[eventId] || feedback[liveKey] || attempted.has(liveKey)) return;
-    const timer = setTimeout(() => { void requestEvent(eventId); }, 1500);
-    return () => clearTimeout(timer);
-  }, [identity, owner, eventId, speed, view?.loaded, entries, feedback, requestEvent]);
+    if (!owner) return;
+    const next = createCommentaryScheduler({ send: requestEvent,
+      hasAttempted: (id) => attempted.has(`${identity}:${id}`),
+      onChange: (status) => setSchedulerStatus({ identity, ...status }) });
+    scheduler.current = next;
+    return () => { next.dispose(); scheduler.current = null; };
+  }, [identity, owner, requestEvent]);
+
+  useEffect(() => {
+    scheduler.current?.observe(battleLog, entries, Boolean(view?.loaded));
+  }, [battleLog, entries, view?.loaded, identity, owner]);
 
   return { entries, entry, loading: !view?.loaded, error: view?.error,
+    requestStatus: schedulerStatus?.identity === identity ? schedulerStatus.lastRequest : null,
     request, expired: Boolean(retryAfter && retryAfter <= now), canRetry: Boolean(owner && retryAfter <= now && (entry?.attempts ?? 0) < 2),
+    canRequest: owner && Boolean(view?.loaded) && !(schedulerStatus?.identity === identity && schedulerStatus.busy),
     requesting: feedback[requestKey]?.state === 'requesting' };
 }

@@ -22,8 +22,8 @@ export default function BattleCommentary({ commentary, owner, compact = false })
     <p role="status">{pending ? 'Gemini commentary is being prepared. Gameplay continues normally.'
       : error ? 'Saved commentary is temporarily unavailable.'
         : entry ? messages[entry.code] ?? 'Gemini commentary is unavailable. The battle result is unchanged.'
-          : owner ? 'Commentary focuses on completed battles. Faster playback limits automatic requests.' : 'No saved Gemini commentary for this battle yet.'}</p>
-    {owner && !pending && !error && <button className="text-button" type="button" disabled={Boolean(entry) && !canRetry}
+          : owner ? 'Selected ongoing phases and battle outcomes are sampled automatically at every playback speed, subject to the commentary allowance.' : 'No saved Gemini commentary for this battle yet.'}</p>
+    {owner && !pending && !error && <button className="text-button" type="button" disabled={commentary.canRequest === false || (Boolean(entry) && !canRetry)}
       onClick={() => { void request(Boolean(entry)); }}>{entry ? 'Retry commentary' : 'Generate commentary'}</button>}
     {owner && entry?.retryAfter > 0 && entry?.state !== 'ready' && <p className="fine-print">Retry after {new Date(entry.retryAfter).toLocaleTimeString()}. At most two generation attempts per event.</p>}
   </aside>;

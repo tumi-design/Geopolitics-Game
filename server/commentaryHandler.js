@@ -36,6 +36,12 @@ export function createCommentaryHandler({ firebase, store, generate }) {
         if (candidate?.type === 'combat_phase') combat = candidate;
       }
       const outcomes = [];
+      let previousPhase = null;
+      if (event.type === 'combat_phase' && event.outcome === 'continue') {
+        const previous = await firebase.get(`games/${gameId}/battles/${eventId - 1}`, token);
+        if (!previous || previous.data.seq !== eventId - 1) throw new CommentaryError('invalid-event', 400);
+        previousPhase = JSON.parse(previous.data.payload);
+      }
       if (event.type === 'country_conquered') {
         for (let following = eventId + 1; following <= Math.min(eventId + 2, parent.data.battleCount); following++) {
           const record = await firebase.get(`games/${gameId}/battles/${following}`, token);
@@ -45,7 +51,7 @@ export function createCommentaryHandler({ firebase, store, generate }) {
         }
       }
       let facts;
-      try { facts = battleFacts(JSON.parse(parent.data.core), event, combat, outcomes); }
+      try { facts = battleFacts(JSON.parse(parent.data.core), event, combat, outcomes, previousPhase); }
       catch { throw new CommentaryError('invalid-event', 400); }
       const lease = await store.claim({ gameId, eventId, uid, retry, hash: factsHash(facts) });
       if (lease.cached) return res.status(lease.cached.state === 'ready' ? 200 : 202).json(lease.cached);

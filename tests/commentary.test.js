@@ -58,12 +58,91 @@ function handlerFixture(generate = async () => ({ text: 'Generated test prose', 
   return { firebase, store, handler: createCommentaryHandler({ firebase, store, generate }) };
 }
 
-test('only completed battles qualify; arbitrary identifiers and browser prompts are rejected', () => {
+test('completed outcomes qualify, pending conquest does not; arbitrary identifiers and browser prompts are rejected', () => {
   const game = fixture();
   assert.equal(isCommentaryEvent(game.battleLog[0]), false);
   assert.equal(isCommentaryEvent(game.battleLog[1]), false);
   assert.equal(isCommentaryEvent(game.battleLog[2]), true);
   for (const body of [{ gameId: '../secret', eventId: 3 }, { gameId, eventId: '3' }, { gameId, eventId: 0 }, { gameId, eventId: 1, prompt: 'invent a win' }]) assert.throws(() => requestIdentifiers(body));
+});
+
+function ongoingFixture() {
+  const game = createInitialGame(countries, '710', () => 0.5);
+  game.turnOrder = game.players.map((player) => player.id); game.turnIndex = 0; game.currentPlayerId = 'human-player';
+  game.countries[0].soldiers = 4; game.countries[1].soldiers = 4;
+  const attack = startAttack(game, 'human-player', game.countries[0].id, game.countries[1].id);
+  let calls = 0;
+  const next = rollAttackPhase(attack, 'human-player', () => calls++ < 3 ? 0.99 : 0);
+  return { next, event: next.battleLog[1], previous: next.battleLog[0] };
+}
+
+test('ongoing facts verify dice, losses, ties, sequence, phase number and surviving armies', () => {
+  const { next, event, previous } = ongoingFixture();
+  const facts = battleFacts(next, event, event, [], previous);
+  assert.equal(facts.outcome, 'ongoing'); assert.equal(facts.phaseNumber, 1);
+  assert.equal(facts.phase.defenderLosses, 3); assert.equal(facts.remainingDefenders, 1);
+  assert.equal(facts.defenderEliminated, false); assert.equal(facts.gameWon, false);
+  for (const patch of [{ phaseNumber: 0 }, { phaseNumber: 2 }, { attackingSoldiers: 1 }, { defendingSoldiers: 0 },
+    { attackerLosses: 1 }, { ties: 99 }, { round: 0 }]) {
+    const invalid = { ...event, ...patch };
+    assert.throws(() => battleFacts(next, invalid, invalid, [], previous));
+  }
+  assert.throws(() => battleFacts(next, event, event));
+  assert.throws(() => battleFacts(next, event, event, [], { ...previous, attackingSoldiers: 99 }));
+  assert.throws(() => battleFacts(next, event, event, [{ type: 'victory' }], previous));
+});
+
+test('ongoing prose describes uncertainty and rejects final outcome claims', async () => {
+  const { next, event, previous } = ongoingFixture();
+  const facts = battleFacts(next, event, event, [], previous);
+  const prose = '{attacker} may sustain pressure while {defender} could still resist.';
+  let sent;
+  const result = await generateCommentary(facts, { client: { models: { generateContent: async (value) => {
+    sent = value; return { text: JSON.stringify({ factsHash: factsHash(facts), commentary: prose }) };
+  } } } });
+  assert.ok(result.text.includes(facts.attacker));
+  assert.match(sent.config.systemInstruction, /outcome ongoing/);
+  for (const word of ['conquered', 'defeated', 'failed', 'eliminated', 'won', 'stopped', 'ended', 'succeeded']) {
+    assert.throws(() => validateGeneratedCommentary({ factsHash: factsHash(facts), commentary: `{attacker} ${word} while {defender} could still resist.` }, facts));
+  }
+});
+
+test('a later meaningful ongoing phase can be generated manually with a verified predecessor', () => {
+  const { next, event: previous } = ongoingFixture();
+  let rolls = 0;
+  const later = rollAttackPhase(next, 'human-player', () => rolls++ % 2 === 0 ? 0 : 0.99);
+  const event = later.battleLog.at(-1);
+  const facts = battleFacts(later, event, event, [], previous);
+  assert.equal(facts.phaseNumber, 2); assert.equal(facts.outcome, 'ongoing');
+  assert.equal(facts.remainingAttackers, 3);
+});
+
+test('all existing terminal fact hashes remain byte-for-byte compatible', () => {
+  assert.equal(factsHash(factsFixture()), 'e581e6019ff0c96fc3ffc41a41059122c21cc517318dd675c6d2530a1c130713');
+  const game = createInitialGame(countries, '710', () => 0.5);
+  game.turnOrder = game.players.map((player) => player.id); game.turnIndex = 0; game.currentPlayerId = 'human-player';
+  game.countries[0].soldiers = 4; game.countries[1].soldiers = 1;
+  let state = startAttack(game, 'human-player', game.countries[0].id, game.countries[1].id);
+  state = stopAttack(state, 'human-player');
+  assert.equal(factsHash(battleFacts(state, state.battleLog.at(-1), null)), 'e8c5720ba09e2c6593edad8fa596c15109bf337dc4f57b55f81feb33d752c5ba');
+  game.countries[0].soldiers = 2; game.countries[1].soldiers = 4;
+  state = startAttack(game, 'human-player', game.countries[0].id, game.countries[1].id);
+  let calls = 0; state = rollAttackPhase(state, 'human-player', () => calls++ % 2 === 0 ? 0 : 0.99);
+  assert.equal(factsHash(battleFacts(state, state.battleLog.at(-1), state.battleLog.at(-1))), 'daec7364f52c54d6c2080ee2a04a87832a14e419a9935555c124493259e4b186');
+});
+
+test('ongoing endpoint reads its persisted predecessor, rejects invalid sequence and still enforces ownership', async () => {
+  const { firebase, handler } = handlerFixture(); const { next, event, previous } = ongoingFixture();
+  firebase.documents.set(`games/${gameId}`, { data: { ownerUid: 'owner', battleCount: 2, core: JSON.stringify(next) }, updateTime: '0' });
+  for (const record of [previous, event]) firebase.documents.set(`games/${gameId}/battles/${record.id}`, { data: { seq: record.id, payload: JSON.stringify(record) }, updateTime: '0' });
+  const first = response(); await handler(request({ gameId, eventId: 2 }), first);
+  assert.equal(first.statusCode, 200);
+  const cached = response(); await handler(request({ gameId, eventId: 2 }), cached);
+  assert.equal(cached.body.text, first.body.text);
+  firebase.documents.get(`games/${gameId}/battles/1`).data.payload = JSON.stringify({ ...previous, phaseNumber: 99, type: 'combat_phase' });
+  const invalid = response(); await handler(request({ gameId, eventId: 2 }), invalid); assert.equal(invalid.statusCode, 400);
+  firebase.authenticate = async () => 'spectator';
+  const denied = response(); await handler(request({ gameId, eventId: 2 }), denied); assert.equal(denied.statusCode, 403);
 });
 test('facts preserve real paired dice, losses, conquest reward and remaining occupation armies', () => {
   const game = fixture(); const event = game.battleLog[2]; const combat = game.battleLog[1];

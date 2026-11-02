@@ -393,4 +393,88 @@ describe('Authentication, saved games and spectators in the browser', { skip: !b
       assert.equal(requests, 0);
     } finally { await readingContext.close(); }
   });
+  for (const speed of [1, 2, 4]) {
+    test(`automatic ongoing commentary at ${speed}x is independent of live activity and pinned selection`, { timeout: 60_000 }, async () => {
+      const id = await page.evaluate(async () => {
+        const { auth } = await import('/src/services/firebase.js');
+        const { gameRepository } = await import('/src/services/gameRepository.js');
+        const { createInitialGame } = await import('/src/engine/gameState.js');
+        const { startAttack, stopAttack, skipTurn, allocateReinforcements } = await import('/src/engine/gameEngine.js');
+        const { countries } = await import('/src/data/countries.js');
+        let game = createInitialGame(countries, '710', () => 0.5);
+        game.turnOrder = game.players.map((player) => player.id); game.turnIndex = 0; game.currentPlayerId = 'human-player';
+        game.countries = game.countries.map((country, index) => ({ ...country, soldiers: index === 1 ? 20 : 4 }));
+        const id = await gameRepository.create(auth.currentUser.uid, game);
+        game = stopAttack(startAttack(game, 'human-player', game.countries[0].id, game.countries[1].id), 'human-player');
+        while (game.currentPlayerId !== 'human-player') game = skipTurn(game, game.currentPlayerId);
+        game = allocateReinforcements(game, 'human-player', [{ countryId: game.countries[0].id, soldiers: game.pendingReinforcements }]);
+        await gameRepository.update(id, auth.currentUser.uid, 0, crypto.randomUUID(), { game });
+        return id;
+      });
+      async function publish(eventId, text) {
+        const record = { eventId, state: 'ready', text, model: 'test-only', factsHash: 'fixture', attempts: 1,
+          createdAt: Date.now(), updatedAt: Date.now(), retryAfter: 0 };
+        const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, typeof value === 'string' ? { stringValue: value } : { integerValue: String(value) }]));
+        const result = await fetch(`http://127.0.0.1:8080/v1/projects/demo-uct-inf4001n/databases/(default)/documents/games/${id}/commentary/${eventId}`, {
+          method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }),
+        });
+        assert.equal(result.ok, true);
+        return record;
+      }
+      await publish(2, 'Earlier completed battle fixture.');
+      let release; let received;
+      const requestReceived = new Promise((resolve) => { received = resolve; });
+      const released = new Promise((resolve) => { release = resolve; });
+      const requests = [];
+      await page.route('**/api/battle-commentary', async (route) => {
+        const body = route.request().postDataJSON(); requests.push(body); received(body);
+        await released;
+        const record = await publish(body.eventId, 'Ongoing phase fixture: pressure remains uncertain.');
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(record) });
+      });
+      try {
+        await page.goto(`${base}?game=${id}`); await ready();
+        const panel = page.getByRole('region', { name: 'Gemini Commentary', exact: true });
+        await panel.getByText('Earlier completed battle fixture.', { exact: true }).waitFor();
+        await panel.getByLabel('Commentary history').selectOption('2');
+        await page.getByLabel('NPC playback speed').selectOption(String(speed));
+        await page.evaluate(() => {
+          // A mixed first phase causes casualties without conquest. Subsequent
+          // pairs tie, keeping the ongoing attack safe for delayed-response checks.
+          let calls = 0;
+          window.originalRandom = Math.random;
+          Math.random = () => {
+            if (!new Error().stack.includes('rollDie')) return window.originalRandom();
+            return [0.99, 0, 0.99, 0, 0, 0.99, 0, 0.99][calls++] ?? 0;
+          };
+        });
+        await page.getByRole('button', { name: 'Skip turn', exact: true }).click();
+        const request = await requestReceived;
+        assert.deepEqual(request, { gameId: id, eventId: 4, retry: false });
+        await page.locator('.live-panel .event-context').filter({ hasText: /Phase 2/ }).waitFor();
+        await page.getByRole('button', { name: 'Pause NPC playback', exact: true }).click(); await ready();
+        const before = await savedPosition();
+        assert.ok(before.game.battleLog.some((event) => event.id === 4 && event.outcome === 'continue'));
+        // Still-in-flight commentary must not prevent independently saved rolls.
+        assert.ok(before.game.npcDecisionLog.length >= 3);
+        release();
+        await panel.getByLabel('Commentary history').locator('option[value="4"]').waitFor({ state: 'attached' });
+        assert.equal(await panel.getByLabel('Commentary history').inputValue(), '2');
+        await panel.getByText('Earlier completed battle fixture.', { exact: true }).waitFor();
+        await panel.getByRole('button', { name: 'Return to latest saved commentary' }).click();
+        await panel.getByText('Ongoing phase fixture: pressure remains uncertain.', { exact: true }).waitFor();
+        assert.equal(requests.length, 1);
+        assert.deepEqual((await savedPosition()).game, before.game);
+        await page.reload(); await ready();
+        const pause = page.getByRole('button', { name: 'Pause NPC playback', exact: true });
+        if (await pause.count() && await pause.isEnabled()) await pause.click();
+        await panel.getByText('Ongoing phase fixture: pressure remains uncertain.', { exact: true }).waitFor();
+        assert.equal(requests.length, 1, 'Restoration does not regenerate the ongoing phase.');
+      } finally {
+        release();
+        await page.evaluate(() => { if (window.originalRandom) Math.random = window.originalRandom; });
+        await page.unroute('**/api/battle-commentary');
+      }
+    });
+  }
 });

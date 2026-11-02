@@ -11,6 +11,7 @@ Use {attacker} and {defender} placeholders for country names, and no other place
 The interface already displays the exact outcome, dice, casualties and remaining armies. Do not repeat numbers, numeric words or casualty claims. Interpret what those supplied facts could mean strategically instead.
 Mention conquest only if outcome is conquered, elimination only if defenderEliminated is true, and overall victory only if gameWon is true.
 For a stopped or failed attack, discuss preserving/rebuilding pressure rather than pretending a country changed ownership.
+For outcome ongoing, describe pressure or uncertainty AT the supplied phaseNumber. The attack is still in progress at that point; do not claim it ended, succeeded, failed, stopped or defeated either country. Later events may already have happened by the time this text is displayed.
 Do not infer why a player stopped; do not describe a voluntary stop as a defeat, failed assault or stalemate. Do not mention borders, frontiers, neighbours or adjacency: this game's geography never limits attacks.
 Return JSON with factsHash copied exactly and commentary containing original prose. No markdown or links.`;
 
@@ -32,6 +33,7 @@ export function validateGeneratedCommentary(value, facts) {
       /\b(casualt\w*|killed|dead|deaths|lost|losses|destroyed)\b/i.test(prose) ||
       /\b(border\w*|frontier\w*|neighbou?r\w*|adjacen\w*)\b/i.test(prose) ||
       (facts.outcome === 'stopped' && /\b(defeat\w*|failed|repelled|stalemate)\b/i.test(prose)) ||
+      (facts.outcome === 'ongoing' && /\b(defeat\w*|fail\w*|repelled|stalemate|ended|finished|stopped|withdrew|succeed\w*|triumph\w*)\b/i.test(prose)) ||
       prose.replace(/[^A-Za-z]/g, '').length < 15) throw rejected('unsupported-claim');
   const text = template.replace(/\{([A-Za-z]+)\}/g, (_, key) => substitutions[key]);
   if (text.length > 900) throw rejected('length');

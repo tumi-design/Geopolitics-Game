@@ -171,7 +171,7 @@ describe('Firestore rules and complete saved games (local emulator)', { skip: !p
     });
   });
 
-  test('server REST authentication, atomic quota lease and commentary persistence work end to end', async () => {
+  test('server REST validates ongoing phases, persists commentary, deduplicates and preserves outcome generation', async () => {
     async function signup(label) {
       const email = `${label}-${Date.now()}@example.com`; const password = 'EmulatorOnly123!';
       const result = await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-key', {
@@ -185,24 +185,35 @@ describe('Firestore rules and complete saved games (local emulator)', { skip: !p
       await setDoc(doc(context.firestore(), 'serverConfig', 'commentary'), { writerUid: writer.localId });
     });
     const ownRepository = createGameRepository(environment.authenticatedContext(player.localId).firestore());
-    const initial = game(); const id = await ownRepository.create(player.localId, initial);
+    const initial = game(); initial.countries[0].soldiers = 4; initial.countries[1].soldiers = 4;
+    const id = await ownRepository.create(player.localId, initial);
     let state = startAttack(initial, 'human-player', initial.countries[0].id, initial.countries[1].id);
     const { stopAttack } = await import('../src/engine/gameEngine.js');
-    state = stopAttack(state, 'human-player');
-    await ownRepository.update(id, player.localId, 0, 'stop-for-commentary', { game: state });
+    let rolls = 0; state = rollAttackPhase(state, 'human-player', () => rolls++ < 3 ? 0.99 : 0);
+    await ownRepository.update(id, player.localId, 0, 'ongoing-for-commentary', { game: state });
     const firebase = createFirebaseRest({ FIREBASE_PROJECT_ID: 'demo-uct-inf4001n', FIREBASE_WEB_API_KEY: 'demo-key', COMMENTARY_USE_EMULATORS: 'true',
       COMMENTARY_WRITER_EMAIL: writer.email, COMMENTARY_WRITER_PASSWORD: writer.password, COMMENTARY_WRITER_UID: writer.localId });
     let calls = 0;
-    const handler = createCommentaryHandler({ firebase, store: createCommentaryStore(firebase), generate: async () => {
+    const suppliedFacts = [];
+    const handler = createCommentaryHandler({ firebase, store: createCommentaryStore(firebase), generate: async (facts) => {
+      suppliedFacts.push(facts);
       calls++; return { text: 'Clearly labelled test fixture, not a real Gemini response.', model: 'test-only' };
     } });
     const req = { method: 'POST', headers: { authorization: `Bearer ${player.idToken}`, 'content-type': 'application/json', host: 'localhost' }, body: { gameId: id, eventId: 2 } };
     function response() { return { setHeader() {}, status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; } }; }
     const first = response(); await handler(req, first); assert.equal(first.statusCode, 200);
+    assert.equal(suppliedFacts[0].outcome, 'ongoing'); assert.equal(suppliedFacts[0].phaseNumber, 1);
     const duplicate = response(); await handler(req, duplicate); assert.equal(duplicate.statusCode, 200); assert.equal(calls, 1);
     const saved = await getDoc(doc(environment.authenticatedContext(player.localId).firestore(), 'games', id, 'commentary', '2'));
     assert.equal(saved.data().state, 'ready');
     assert.deepEqual((await loaded(ownRepository, id)).game, state);
     const anonymous = response(); await handler({ ...req, headers: {} }, anonymous); assert.equal(anonymous.statusCode, 401);
+    await ownRepository.update(id, player.localId, 1, 'share-ongoing', { isShared: true });
+    await assertSucceeds(getDoc(doc(publicDb, 'games', id, 'commentary', '2')));
+    await assertFails(updateDoc(doc(publicDb, 'games', id, 'commentary', '2'), { text: 'Forged' }));
+    state = stopAttack(state, 'human-player');
+    await ownRepository.update(id, player.localId, 2, 'stop-after-ongoing', { game: state });
+    const outcome = response(); await handler({ ...req, body: { gameId: id, eventId: 3 } }, outcome);
+    assert.equal(outcome.statusCode, 200); assert.equal(suppliedFacts[1].outcome, 'stopped'); assert.equal(calls, 2);
   });
 });

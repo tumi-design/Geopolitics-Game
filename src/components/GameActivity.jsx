@@ -41,7 +41,7 @@ function BattleEvent({ game, event }) {
   }
 }
 
-export default function GameActivity({ game, gameId, user, owner = false, speed = 1 }) {
+export default function GameActivity({ game, gameId, user, owner = false }) {
   const activity = getLiveActivity(game);
   const { event, combat, outcomes, decision, decisionIsCurrent } = activity;
   const commentaryEvent = commentaryEventForActivity(activity);
@@ -49,7 +49,7 @@ export default function GameActivity({ game, gameId, user, owner = false, speed 
   const identity = `${gameId}:${user?.uid ?? 'spectator'}`;
   const selectedId = selection?.identity === identity ? selection.id : null;
   const commentary = useBattleCommentary({ gameId, user, owner, eventId: commentaryEvent?.id,
-    displayEventId: selectedId ?? commentaryEvent?.id, speed });
+    displayEventId: selectedId ?? commentaryEvent?.id, battleLog: game.battleLog });
   const decisionTitles = { reinforce: 'Reinforcements allocated', transfer: 'Soldiers transferred', skip: 'Turn skipped' };
   return <>
     <section className="panel live-panel" aria-labelledby="live-title">

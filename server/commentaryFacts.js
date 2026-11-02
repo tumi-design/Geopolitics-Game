@@ -11,7 +11,7 @@ export function requestIdentifiers(body) {
   return body;
 }
 
-export function battleFacts(core, event, combat, outcomes = []) {
+export function battleFacts(core, event, combat, outcomes = [], previousPhase = null) {
   if (!isCommentaryEvent(event) || !Number.isSafeInteger(event.id) || event.id < 1) throw new Error('unsupported-event');
   const source = countries.find((country) => country.id === event.sourceCountryId);
   const target = countries.find((country) => country.id === event.targetCountryId);
@@ -27,6 +27,7 @@ export function battleFacts(core, event, combat, outcomes = []) {
     if (combat.attackerRolls.length !== getCombatDiceCount(combat.attackingSoldiersBefore, combat.defendingSoldiersBefore)) throw new Error('invalid-dice');
     const resolved = resolveCombatRound(combat.attackerRolls, combat.defenderRolls);
     if (resolved.attackerLosses !== combat.attackerLosses || resolved.defenderLosses !== combat.defenderLosses ||
+        (combat.outcome === 'continue' && resolved.ties !== combat.ties) ||
         combat.attackingSoldiersBefore - resolved.attackerLosses !== combat.attackingSoldiers ||
         combat.defendingSoldiersBefore - resolved.defenderLosses !== combat.defendingSoldiers) throw new Error('invalid-dice');
     phase = { attackerRolls: combat.attackerRolls, defenderRolls: combat.defenderRolls,
@@ -39,12 +40,27 @@ export function battleFacts(core, event, combat, outcomes = []) {
       combat.attackingSoldiers + event.reward - event.soldiersTransferred !== event.attackingSoldiers ||
       event.defendingSoldiers !== event.soldiersTransferred)) throw new Error('invalid-conquest');
   if (event.outcome === 'attack_failed' && event.attackingSoldiers !== 1) throw new Error('invalid-defeat');
+  const ongoing = event.type === 'combat_phase' && event.outcome === 'continue';
+  if (ongoing && (combat !== event || event.round < 1 || !Number.isSafeInteger(event.phaseNumber) || event.phaseNumber < 1 ||
+      event.attackingSoldiers < 2 || event.defendingSoldiers < 1 ||
+      !safeCount(event.attackerLosses) || !safeCount(event.defenderLosses) ||
+      event.attackerLosses + event.defenderLosses < 1 || outcomes.length > 0)) throw new Error('invalid-ongoing');
+  if (ongoing && (!previousPhase || previousPhase.id !== event.id - 1 ||
+      previousPhase.playerId !== event.playerId || previousPhase.round !== event.round ||
+      previousPhase.sourceCountryId !== event.sourceCountryId || previousPhase.targetCountryId !== event.targetCountryId ||
+      previousPhase.attackingSoldiers !== event.attackingSoldiersBefore || previousPhase.defendingSoldiers !== event.defendingSoldiersBefore ||
+      (event.phaseNumber === 1 ? previousPhase.type !== 'attack_started'
+        : previousPhase.type !== 'combat_phase' || previousPhase.outcome !== 'continue' || previousPhase.phaseNumber !== event.phaseNumber - 1))) {
+    throw new Error('invalid-ongoing-sequence');
+  }
   return { eventId: event.id, round: event.round, attacker: source.name, defender: target.name,
-    outcome: event.type === 'country_conquered' ? 'conquered' : event.type === 'attack_stopped' ? 'stopped' : 'attack_failed',
+    outcome: ongoing ? 'ongoing' : event.type === 'country_conquered' ? 'conquered' : event.type === 'attack_stopped' ? 'stopped' : 'attack_failed',
     phase, remainingAttackers: event.attackingSoldiers, remainingDefenders: event.defendingSoldiers,
     conquestReward: event.reward ?? 0, occupationSoldiers: event.soldiersTransferred ?? 0,
     defenderEliminated: outcomes.some((item) => item.type === 'player_eliminated' && item.eliminatedPlayerId === event.previousOwnerId),
-    gameWon: outcomes.some((item) => item.type === 'victory' && item.winnerId === event.playerId) };
+    gameWon: outcomes.some((item) => item.type === 'victory' && item.winnerId === event.playerId),
+    // Do not add fields to existing terminal facts: their cached hashes persist.
+    ...(ongoing ? { phaseNumber: event.phaseNumber } : {}) };
 }
 
 export function factsHash(facts) {
