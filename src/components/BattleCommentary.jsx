@@ -13,7 +13,7 @@ export default function BattleCommentary({ commentary, owner, compact = false })
   const { entry, requesting, error, canRetry, request, expired } = commentary;
   if (entry?.state === 'ready') return <aside className="battle-commentary" aria-label="Gemini battle commentary">
     <span className="eyebrow">GEMINI COMMENTARY</span><p>{entry.text}</p>
-    {!compact && <span className="fine-print">AI-generated · {entry.model} · game results above remain authoritative</span>}
+    {!compact && <span className="fine-print">AI-generated · {entry.model}</span>}
   </aside>;
   if (compact) return null;
   const pending = requesting || entry?.state === 'requesting' || (entry?.state === 'pending' && !expired);

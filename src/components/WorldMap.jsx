@@ -86,6 +86,6 @@ export default function WorldMap({ countries, selectedId, onSelect, game }) {
       </MapContainer>}
     </div>
     <div className="map-footer"><div className="map-legend"><span><i className="legend-dot selected-dot" />{game ? 'You' : 'Selected'}</span><span><i className={`legend-dot ${game ? 'npc-dot' : 'available-dot'}`} />{game ? 'NPC' : 'Available'}</span><span><i className="legend-dot inactive-dot" />{game ? 'Outside this game' : 'Outside game catalogue'}</span></div><small>Use + / − to zoom</small></div>
-    <p className="map-attribution">Boundaries: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> / world-atlas · simplified for this overview</p>
+    <p className="map-attribution">Boundaries: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> / world-atlas</p>
   </section>;
 }
