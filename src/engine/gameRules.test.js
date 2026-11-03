@@ -10,7 +10,7 @@ import {
   rollCombatRound,
 } from "./gameRules.js";
 
-test("population thresholds follow the entrance exam table", () => {
+test("population thresholds follow the entrance exam population table", () => {
   const cases = [
     [5_000_000, 1],
     [5_000_001, 2],

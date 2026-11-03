@@ -13,7 +13,7 @@ export default function SaveStatus({ session, owner }) {
       : session.busy ? 'Saving to Firestore…'
         : session.pending ? 'Save needs attention. Gameplay is paused.'
           : session.fromCache ? 'Connection unavailable. Viewing the last received position; moves are disabled until reconnected.'
-            : owner ? 'Saved to Firestore. Each action is saved automatically.' : 'Spectator view · live updates · moves are disabled.'}</p>
+            : owner ? 'Your progress is saved automatically.' : 'Spectator view · live updates · moves are disabled.'}</p>
     {session.error && <div role="alert" className="game-error"><p>{session.error}</p>
       {!session.pending && session.game && <button className="text-button" onClick={session.clearError}>Dismiss error</button>}
       {session.pending && <button className="secondary-button" disabled={session.busy} onClick={session.retrySave}>Retry the same save</button>}
@@ -24,7 +24,7 @@ export default function SaveStatus({ session, owner }) {
       <label><input type="checkbox" checked={session.metadata.isShared} disabled={!session.canEdit} onChange={(event) => { setCopied(false); void session.setSharing(event.target.checked); }} /> Allow spectators with this link</label>
       {session.metadata.isShared && <div className="share-link"><label className="action-field">Spectator link<input readOnly value={link.href} onFocus={(event) => event.target.select()} /></label>
         <button className="secondary-button" onClick={copyLink}>{copied ? 'Copied' : 'Copy link'}</button></div>}
-      <p className="fine-print">Games are private by default. Turning sharing off revokes future access; it cannot retract copies already viewed.</p>
+      <p className="fine-print">Games are private by default. Turning sharing off revokes future access.</p>
     </div>}
   </section>;
 }

@@ -22,7 +22,7 @@ export function firebaseErrorMessage(error) {
     'auth/network-request-failed': 'Unable to connect. Check your connection and try again.',
     'auth/operation-not-allowed': 'Enable Email/Password sign-in in Firebase Authentication.',
     'auth/unauthorized-domain': 'Add this hostname to Firebase Authentication → Settings → Authorized domains.',
-    'permission-denied': 'Access denied. Check the account, sharing setting, and deployed Firestore rules.',
+    'permission-denied': 'Access denied. This game is private or sharing has been disabled.',
     'unavailable': 'Firestore is unavailable or offline. Reconnect and retry the same save.',
     'resource-exhausted': 'Firebase quota has been reached. Check Firestore Usage in the Firebase Console.',
     'conflict': 'This game changed in another tab. Reload the saved position before continuing.',

@@ -76,7 +76,8 @@ deployed rules, not to switch to public write access.
 2. Choose a country and create a game. It contains exactly ten participants.
    Create a second game; both should remain in **Saved games**. Select either
    entry to resume it.
-3. Make moves and watch **Saving to Firestore…** become **Saved to Firestore**.
+3. Make moves and watch **Saving to Firestore…** become
+   **Your progress is saved automatically.**
    Refresh during a human turn, including during an attack or pending
    occupation: countries, soldiers, round, active attack and histories must be
    restored, rather than creating a new game.

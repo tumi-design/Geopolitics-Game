@@ -32,7 +32,7 @@ describe('Authentication, saved games and spectators in the browser', { skip: !b
     });
   }
   async function ready() {
-    await page.getByText('Saved to Firestore. Each action is saved automatically.').waitFor();
+    await page.getByText('Your progress is saved automatically.').waitFor();
   }
   test('registration, multiple sessions, refresh, errors, live spectators and sign-out', { timeout: 120_000 }, async () => {
     const email = `browser-${Date.now()}@example.com`;

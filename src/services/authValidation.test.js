@@ -12,7 +12,7 @@ test('registration validates email, password length and confirmation', () => {
 });
 test('authentication errors are readable without revealing account existence on login', () => {
   assert.equal(firebaseErrorMessage({ code: 'auth/user-not-found' }), firebaseErrorMessage({ code: 'auth/wrong-password' }));
-  assert.match(firebaseErrorMessage({ code: 'permission-denied' }), /rules/);
+  assert.equal(firebaseErrorMessage({ code: 'permission-denied' }), 'Access denied. This game is private or sharing has been disabled.');
   assert.match(firebaseErrorMessage({ code: 'unavailable' }), /retry/);
   assert.match(firebaseErrorMessage({ code: 'conflict' }), /another tab/);
 });

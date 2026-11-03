@@ -57,7 +57,13 @@ export default function GameActivity({ game, gameId, user, owner = false }) {
       <div className="live-update" aria-live="polite" aria-atomic="true">
         {event ? <>
           <p className="event-context">Round {event.round} · {playerName(game, event.playerId)}{combat ? ` · Phase ${combat.phaseNumber}` : ''}</p>
-          <h3 className="live-matchup">{countryName(game, event.sourceCountryId)} <span aria-label="against">→</span> {countryName(game, event.targetCountryId)}</h3>
+          <h3 className="live-matchup live-battle-matchup">
+            <span className="eyebrow matchup-role attacker-role">ATTACKER</span>
+            <span className="attacker-name">{countryName(game, event.sourceCountryId)}</span>
+            <span className="matchup-arrow" aria-label="against">→</span>
+            <span className="eyebrow matchup-role defender-role">DEFENDER</span>
+            <span className="defender-name">{countryName(game, event.targetCountryId)}</span>
+          </h3>
           {combat && <DiceResults event={combat} showOutcome={false} />}
           <div className="live-outcome">
             {event.type === 'combat_phase' ? <p>{event.outcome === 'conquest_pending' ? 'Defenders defeated. Choose occupation soldiers to complete conquest.'

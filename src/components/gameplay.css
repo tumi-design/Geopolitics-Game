@@ -28,7 +28,13 @@
 .live-panel { border-color: #505A55; }
 .live-update .event-context { font-size: 11px; color: var(--champagne); }
 .live-update .live-matchup { font-size: 21px; line-height: 1.5; margin: 8px 0 18px; overflow-wrap: anywhere; }
-.live-matchup > span { color: var(--muted); margin: 0 8px; }
+.live-battle-matchup { display: grid; grid-template-columns: minmax(0, auto) auto minmax(0, auto); grid-template-areas: "attacker-role . defender-role" "attacker-name arrow defender-name"; width: fit-content; max-width: 100%; align-items: start; row-gap: 4px; }
+.live-matchup > .matchup-arrow { grid-area: arrow; color: var(--muted); margin: 0 8px; }
+.live-matchup .matchup-role { color: var(--muted); }
+.live-battle-matchup > .attacker-role { grid-area: attacker-role; }
+.live-battle-matchup > .defender-role { grid-area: defender-role; }
+.live-battle-matchup > .attacker-name { grid-area: attacker-name; min-width: 0; }
+.live-battle-matchup > .defender-name { grid-area: defender-name; min-width: 0; }
 .live-outcome { border-left: 2px solid var(--sage); padding-left: 14px; margin-top: 16px; }
 .history-panel > summary { padding: 18px 22px; cursor: pointer; font-size: 13px; color: var(--text); }
 .history-panel > summary::marker { color: var(--champagne); }

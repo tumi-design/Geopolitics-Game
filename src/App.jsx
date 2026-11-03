@@ -55,7 +55,6 @@ export default function App() {
     <header className="site-header">
       <div className="brand"><span className="brand-symbol" aria-hidden="true">◎</span><div>GEOPOLITICS<span>TEN NATIONS. ONE VICTOR.</span></div></div>
       <div className="header-location"><span className="header-dot" />WORLD OVERVIEW</div>
-      <span className="preview-label">DESIGN PREVIEW <span>01</span></span>
     </header>
     <main id="main-content">
       <div className="page-intro">
@@ -98,7 +97,7 @@ export default function App() {
         <GameActivity game={game} gameId={session.id} user={account.user} speed={session.speed}
           owner={Boolean(account.user && session.metadata?.ownerUid === account.user.uid && !account.busy)} />
       </div>}
-      <div className="development-note"><span className="note-icon" aria-hidden="true">i</span><p><strong>Population reference.</strong> The {countries.length}-country catalogue uses <a href={populationReference.sourceUrl} target="_blank" rel="noreferrer">Worldometer {populationReference.year}</a> annual estimates. Starting soldiers follow the UCT population thresholds.</p></div>
+      <div className="development-note"><span className="note-icon" aria-hidden="true">i</span><p><strong>Population reference.</strong> The {countries.length}-country catalogue uses <a href={populationReference.sourceUrl} target="_blank" rel="noreferrer">Worldometer {populationReference.year}</a> annual estimates.</p></div>
     </main>
     <footer className="site-footer"><span>UCT INF4001N <span className="footer-divider">/</span> BCOM HONS IS 2027</span><span>Explore thoughtfully. Think globally.</span></footer>
   </div>;
