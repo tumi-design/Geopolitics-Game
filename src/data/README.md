@@ -54,12 +54,16 @@ the accessible country list is the primary alternative to map clicks.
 `WorldMap.jsx` uses React Leaflet 5 / Leaflet 1.9.4 with an equirectangular
 projection (`CRS.EPSG4326`). It fetches the local GeoJSON once, with loading,
 failure and retry states. It does not fetch map tiles or use an API key.
-All flags are also served locally. No runtime external requests are required.
+All flags are also served locally. These map/flag assets require no external
+runtime requests; authentication, cloud saves and commentary do use network services.
 
-Games run locally in React memory. Refreshing resets them. Opening New game
-pauses NPC playback and retains the current game until a replacement is created;
-Return to current game cancels setup. See `../game/README.md` for human controls,
-NPC playback, and the presentation guide.
+The active board is rendered in React, while complete confirmed games and their
+histories are persisted to the owner's Firestore sessions. Refresh restores the
+last confirmed save, including active combat and pending occupation; it does not
+reset the game. Opening New game suspends NPC playback and retains the current
+session; Return to current game cancels setup. See the
+[gameplay guide](../game/README.md) and [root README](../../README.md) for controls,
+accounts, cloud saves and local startup.
 
 ## Auditable country values
 

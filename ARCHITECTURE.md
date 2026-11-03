@@ -20,21 +20,25 @@ The player competes against strategic non-player characters
 - NoSQL database: Cloud Firestore
 - Application hosting: Vercel
 - Server-side AI integration: Vercel Functions
-- AI-generated battle commentary: Gemini API, subject to
-  verification of access, limits and acceptable usage.
+- AI-generated battle commentary: Gemini Developer API via the official
+  `@google/genai` SDK, with fact validation and bounded sampling.
 
 ## 3. Application structure
 
+```text
 src/
   components/   Reusable interface components
-  pages/        Main application screens
+  hooks/        Authentication, saved sessions and commentary coordination
+  game/         UI action routing and commentary sampling/scheduling
   engine/       Game rules, combat and NPC strategy
   services/     Database, authentication and API services
   data/         Country and population data
-  utils/        Shared helper functions
 
 api/
   battle-commentary.js   Server-side AI commentary endpoint
+server/        Commentary validation, generation, quotas and Firebase REST
+scripts/       Local API adapter, emulator setup and explicit provider checks
+```
 
 ## 4. Core design principles
 
@@ -85,6 +89,10 @@ NPC decisions, battle commentary and fast-forward controls.
 
 ## 7. Deployment
 
+Live application: [uct-inf-4001-n.vercel.app](https://uct-inf-4001-n.vercel.app),
+as supplied by the project owner. These are maintenance/verification steps;
+local test results do not establish the currently deployed commit or settings.
+
 - Develop and test locally using Vite.
 - Store source code in the private GitHub repository.
 - Deploy the application through Vercel.
@@ -131,14 +139,24 @@ state, and `gameRepository.js` owns Firestore queries, transactions and listener
 engine to serialized cloud saves and step-by-step NPC playback. Account, library
 and save/sharing controls are separate React components.
 
-Games have private owner-controlled core documents and append-only battle/NPC
+Games are separate single-player sessions, each with one human and nine NPCs;
+sharing adds read-only spectators, not multiplayer turn-taking. They have
+private owner-controlled core documents and append-only battle/NPC
 history subcollections. Shared games expose read-only live listeners; only the
-owner can edit. Rules are tracked in `firestore.rules`, but production deployment
-and real-project acceptance checks remain manual. See `FIREBASE_SETUP.md` for
+owner can edit. Rules are tracked in `firestore.rules`; production rule/settings
+verification and real-project acceptance checks are administrator tasks, not
+implied by a local build. See `FIREBASE_SETUP.md` for
 the schema, emulator tests, deployment commands and limitations.
 
 Gemini battle commentary now uses `api/battle-commentary.js` with server helpers
 in `server/`. A dedicated restricted Auth writer persists commentary in its own
 subcollection, independently of engine saves. See `GEMINI_COMMENTARY.md` for
-authorization, quotas, local setup and remaining manual production steps.
-Website deployment and assignment submission remain outstanding.
+authorization, quotas, local setup and deployment verification. Automatic sampling
+includes the first casualty-producing ongoing phase per attack and completed
+outcomes at every playback speed, with one in-flight/one pending request and
+30-second automatic pacing. Saved reading selection is independent of generation;
+provider latency and quotas prevent guaranteed commentary for every battle.
+
+The website is deployed at the address above. Final acceptance evidence, source
+ZIP, private assessor access and Amathuba submission still need confirmation.
+The assessor-facing entry point and setup instructions are in [README.md](README.md).

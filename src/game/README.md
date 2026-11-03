@@ -1,8 +1,13 @@
-# Local gameplay and presentation guide
+# Gameplay and presentation guide
 
 Start the application from the repository root with `npm.cmd run dev` and open
 the Local URL Vite prints. `node --test`, `npm.cmd run lint`, and
 `npm.cmd run build` run the automated checks.
+
+The live game is [uct-inf-4001-n.vercel.app](https://uct-inf-4001-n.vercel.app).
+For installation, Firebase environment names and the separate local commentary
+API process, begin with the [root README](../../README.md). Single-player games
+have one human owner and nine NPCs; shared visitors are read-only spectators.
 
 ## Playing a turn
 
@@ -36,8 +41,10 @@ the current game until a replacement is created. Errors retain the last valid
 board. Dismiss an error before resuming playback; persistent invalid state or
 safety-limit errors require starting a new game.
 
-The latest dice remain visible between moves. Battle history and NPC decisions
-show all retained records, newest first, in separately scrollable lists.
+Live Activity shows the current battle phase/outcome or latest NPC preparation
+decision. Battle history and NPC decision history retain all earlier records,
+newest first, in separate collapsible, scrollable lists; older dice are not lost
+when the live panel advances.
 NPC explanations are strategy-generated text, not LLM commentary.
 
 Victory means the human owns all ten countries. If the human loses their last
@@ -63,5 +70,7 @@ and stored alongside its immutable battle event. See `../../GEMINI_COMMENTARY.md
 for local setup and quota policy. The
 55-country catalogue uses Worldometer's 2026 annual population estimates, with
 per-country source links and reference-year documentation in `../data/README.md`.
-Firebase accounts and saves are implemented; production configuration and
-website deployment still require the documented manual steps.
+The standalone Gemini Commentary panel samples ongoing phases and completed
+outcomes at all playback speeds, subject to bounded scheduling and quotas. Older
+saved text can stay pinned while play advances. The website is deployed; final
+production acceptance and submission access arrangements still need confirmation.

@@ -10,11 +10,12 @@ source, or be committed. `.env.local`, `.env.commentary-emulator.local` and
 Vercel local state are ignored by Git; `.vercelignore` also excludes local
 environment files from CLI uploads.
 
-Selected model: **`gemini-3.5-flash-lite`**, through the official `@google/genai`
-SDK. Google's current documentation lists this stable Flash-family model with
-free input/output usage. A real SDK request with the locally supplied key has
-succeeded. Access and rate limits remain project-specific; check AI Studio's
-Usage / Rate limits. The implementation does not enable billing or silently
+Configured model: **`gemini-3.5-flash-lite`**, through the official `@google/genai`
+SDK. A previous development milestone recorded a successful real SDK request.
+The latest regression checks use mocks; they do not reverify current model access,
+pricing or remaining provider quota. The administrator should check AI Studio's
+Usage / Rate limits and the provider references below. The implementation does
+not enable billing or silently
 switch to a paid model. References:
 [model](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite),
 [pricing](https://ai.google.dev/gemini-api/docs/pricing),
@@ -130,26 +131,24 @@ battle therefore cannot overwrite newer moves or appear under a new battle.
 
 ## Local browser testing: recommended isolated demo setup
 
-Use Node 22+ (the project currently runs on Node 24) and Java 21+ on PATH.
+This section enables **real quota-consuming generation**, even though Firebase
+data is isolated in demo emulators. For mocked browser regressions, use
+[FIREBASE_SETUP.md](FIREBASE_SETUP.md#6-automated-checks-and-local-emulators) instead;
+no real commentary API or key is needed for that suite.
+
+Use Node 24 (the tested runtime) and Java 21+ on PATH.
 Keep the real `GEMINI_API_KEY=...` saved in the root `.env.local`. Do not replace
 or print that file. Install dependencies with `npm.cmd install` if needed.
 
 **Terminal 1**, repository root:
 
 ```powershell
-# This machine's existing temporary Java runtime, if Java is not on PATH:
-$demoJava = Join-Path $env:TEMP 'uct-java21\jdk-21.0.13+9-jre'
-if (Test-Path (Join-Path $demoJava 'bin\java.exe')) {
-  $env:JAVA_HOME = $demoJava
-  $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
-}
 java -version
 npx.cmd firebase emulators:start --project demo-uct-inf4001n --only auth,firestore
 ```
 
-That temporary runtime was used for these checks. If it has been removed and
-`java -version` fails, install a Java 21+ runtime and add its `bin` directory to
-PATH before starting the emulators.
+If `java -version` fails, install a Java 21+ runtime and add its `bin` directory
+to PATH before starting the emulators.
 
 **Terminal 2**, same root:
 
@@ -172,6 +171,10 @@ your real Gemini key from `.env.local`. The API listens on `127.0.0.1:3001`.
 $env:VITE_USE_FIREBASE_EMULATORS='true'
 $env:VITE_FIREBASE_PROJECT_ID='demo-uct-inf4001n'
 $env:VITE_FIREBASE_API_KEY='demo-key'
+$env:VITE_FIREBASE_AUTH_DOMAIN='demo-uct-inf4001n.firebaseapp.com'
+$env:VITE_FIREBASE_STORAGE_BUCKET='demo-uct-inf4001n.appspot.com'
+$env:VITE_FIREBASE_MESSAGING_SENDER_ID='123'
+$env:VITE_FIREBASE_APP_ID='demo-app'
 npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
@@ -204,7 +207,10 @@ real key's free-tier allowance.
 
 ## Real Firebase project: manual administrator steps
 
-These steps have **not** been performed automatically in production:
+These are administrator configuration/reproduction instructions, not a claim
+that existing production setup is missing. The owner reports a live deployment
+and deployed rules. Confirm its current settings; do not duplicate an existing
+writer account or change rules merely to follow this guide.
 
 1. Firebase Console → project `uct-inf4001n-geopolitics` → Authentication →
    Users → Add user. Create a dedicated writer email/password. Use a long,
@@ -242,12 +248,13 @@ If a writer credential is compromised, change its password and replace/revoke
 the configured `writerUid` to remove its rule authorization immediately. Never
 weaken the rules to allow owner/client commentary writes as a workaround.
 
-## Future Vercel setup
+## Vercel deployment and maintenance
 
-Do not deploy until you review and explicitly choose to do so. No hosting or
-production deployment is performed by these changes.
+Live application: [uct-inf-4001-n.vercel.app](https://uct-inf-4001-n.vercel.app).
+This guide explains reproduction and maintenance; documentation updates do not
+deploy, inspect private production settings or certify the deployed commit.
 
-When ready, import this repository into Vercel using the Vite preset. Root
+For a new deployment, import this repository into Vercel using the Vite preset. Root
 `api/battle-commentary.js` becomes the same-origin function; `vercel.json` sets
 a sixty-second limit. Configure the existing `VITE_FIREBASE_*` web variables
 and these **server-side** variables in the Vercel project's Settings →
@@ -266,7 +273,7 @@ FIREBASE_WEB_API_KEY                       (optional explicit override)
 Do not add `VITE_` to the Gemini key or writer credentials. Do not upload local
 environment files or commit values. Redeploy after changing Vercel variables.
 Add the deployed hostname to Firebase Authentication's authorized domains.
-Complete the real-project writer/rule steps above first. Firebase remains on
+Confirm the real-project writer/rule configuration above first. Firebase remains on
 Spark; no Firebase billing upgrade is required. Vercel and Gemini have their
 own quotas/terms; keep their free-tier limits and do not enable paid fallback.
 
@@ -277,6 +284,13 @@ npm.cmd test
 npm.cmd run test:firebase
 npm.cmd run lint
 npm.cmd run build
+```
+
+The commands above are routine checks; emulator tests write only demo fixtures.
+Do not opt into live-provider tests while running a safe regression suite.
+**Optional real-quota check, only when deliberately authorised:**
+
+```powershell
 npm.cmd run check:gemini
 ```
 
@@ -330,12 +344,19 @@ development environment blocks network access from background processes.
 - `scripts/dev-api.mjs`, `setup-commentary-emulator.mjs`, `check-gemini.mjs`:
   local handler adapter, safe demo writer setup and explicit real smoke check.
 
-Still manual/outside this task: production writer account/config/rule deployment,
-Vercel environment variables and deployment, and final real-project acceptance
-checks and UCT submission/access documentation. The existing engine, NPC
+Remaining handover work: verify the deployed commit and production settings,
+complete final acceptance evidence and confirm UCT submission/access arrangements.
+The live URL does not by itself establish current Gemini generation or quota.
+The existing engine, NPC
 strategy, map customization and fifty-five-country catalogue are unchanged.
 
 ## Verification and complete change list
+
+Latest completed repository-class milestone, 3 November 2026: **159 regular tests,
+12 Firebase emulator tests and 8 mocked browser tests passed (179 total, zero
+failures)**, with clean ESLint and a successful build (large-chunk advisory).
+No real provider request was made for that milestone or this documentation update.
+The dated entries below are historical records, not current production certification.
 
 Compliance-sampling update verified on 2 November 2026 with **154 regular tests,
 10 Firebase emulator integration tests and 8 browser tests** passing, **0

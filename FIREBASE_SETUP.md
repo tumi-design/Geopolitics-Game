@@ -2,13 +2,17 @@
 
 The application uses the modular Firebase web SDK, Email/Password Authentication
 and the `(default)` Cloud Firestore database. No service account, Admin SDK,
-Cloud Function, paid extension, or hosting deployment is used.
+Firebase Cloud Function or paid extension is used. Website hosting and the
+commentary API use Vercel at [the live application](https://uct-inf-4001-n.vercel.app).
+See [README.md](README.md) for the assessor-facing overview and startup steps.
 
 ## 1. Local configuration
 
-`.env.local` has been created with the supplied web-app configuration and is
-ignored by Git. `.env.example` documents all required variables for another
-checkout. Do not commit `.env.local`. Vite embeds `VITE_` variables in the browser
+An existing developer checkout may have an ignored `.env.local`; a fresh checkout
+does not include it. Copy `.env.example` only if `.env.local` does not already
+exist, then obtain the web-app configuration privately. All six `VITE_FIREBASE_*`
+fields listed in the template must be non-empty. Do not commit `.env.local`.
+Vite embeds `VITE_` variables in the browser
 bundle: Firebase web configuration identifies the app; **Firestore rules provide
 the access control**. Never put service-account or LLM credentials in these
 variables.
@@ -31,7 +35,7 @@ In project **uct-inf4001n-geopolitics**:
 1. Authentication → Sign-in method: confirm Email/Password is enabled.
 2. Authentication → Settings → Authorized domains: confirm `localhost` is
    listed for local development. Add `127.0.0.1` if using that hostname. Add the
-   actual website hostname when hosting is implemented later.
+   deployed hostname `uct-inf-4001-n.vercel.app` for the live application.
 3. Firestore Database: confirm the `(default)` database exists. Its production
    mode rules may still deny every request until the rules below are deployed.
 4. Authentication → Settings → Password policy: the app checks six characters
@@ -58,8 +62,10 @@ check Firestore → Rules in the Console for the deployed rules. Index exemption
 keep large serialized payloads out of indexes; the library's owner query uses
 the standard single-field `ownerUid` index.
 
-**Production rules have not been deployed by this implementation.** A
-permission-denied error is a reason to check the account, sharing flag and
+The owner reports that production rules have been deployed. Confirm the actual
+deployed version before assessment or after rule changes; this documentation
+update neither deploys nor independently certifies it. A permission-denied error
+is a reason to check the account, sharing flag and
 deployed rules, not to switch to public write access.
 
 ## 4. Browser acceptance checks
@@ -109,7 +115,14 @@ games/{gameId}
   core (JSON), battleCount, decisionCount
   battles/{sequence}:   seq, payload (one complete engine event as JSON)
   decisions/{sequence}: seq, payload (one NPC decision and explanation as JSON)
+  commentary/{eventId}: state, text, model, factsHash, attempts, timestamps
 ```
+
+`GameRepository` encapsulates the injected Firestore connection in `#database`,
+with private `#games()` and `#gameRef()` helpers and bound public create/update/
+watch/watchList/remove methods. The factory and singleton exports are preserved.
+Each watch has its own local state and unsubscribe function. See
+[ARCHITECTURE.md](ARCHITECTURE.md#object-oriented-database-access).
 
 `core` contains every other engine field, including all countries/players,
 ownership, soldiers and original values, turn order/index/counter, current
@@ -162,6 +175,7 @@ already running, run instead:
 
 ```powershell
 $env:FIRESTORE_EMULATOR_HOST='127.0.0.1:8080'
+$env:FIREBASE_AUTH_EMULATOR_HOST='127.0.0.1:9099'
 node --test tests/firebase.integration.test.js
 ```
 
@@ -177,6 +191,10 @@ Terminal 2 (environment changes apply only to this terminal):
 $env:VITE_USE_FIREBASE_EMULATORS='true'
 $env:VITE_FIREBASE_PROJECT_ID='demo-uct-inf4001n'
 $env:VITE_FIREBASE_API_KEY='demo-key'
+$env:VITE_FIREBASE_AUTH_DOMAIN='demo-uct-inf4001n.firebaseapp.com'
+$env:VITE_FIREBASE_STORAGE_BUCKET='demo-uct-inf4001n.appspot.com'
+$env:VITE_FIREBASE_MESSAGING_SENDER_ID='123'
+$env:VITE_FIREBASE_APP_ID='demo-app'
 npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
@@ -196,6 +214,10 @@ from your real project. Stop emulators and Vite with Ctrl+C; use a fresh
 terminal for real-project development so emulator environment overrides are
 not accidentally retained.
 
+The values in this demo block are non-secret test identifiers, not production
+configuration. Browser tests mock commentary; do not start a real commentary API
+or set `RUN_LIVE_GEMINI=true` for this suite. Use Node 24, the tested runtime.
+
 The package override updates Firebase's Node-only `@grpc/grpc-js` dependency to
 a patched version; it does not change browser gameplay. See
 [the gRPC advisory](https://github.com/advisories/GHSA-m9gg-hp2v-232j).
@@ -209,9 +231,10 @@ tabs add reads. Inspect Firestore → Usage: the free quota is finite and long
 4× playback sessions can consume it. Quota errors pause gameplay and preserve
 the pending candidate; they do not discard history or weaken rules.
 
-Still to do: deploy/verify the latest rules in the real project, perform
-real-project acceptance checks, deploy/test the website, and complete the UCT
-submission documentation, assessor access and source archive. Gemini battle
+The website is deployed at the live URL above. Confirm the deployed rules,
+configured writer, production acceptance checks and deployed commit before
+submission; private assessor access, source archive and Amathuba handover also
+require confirmation. Gemini battle
 commentary is now implemented separately; see `GEMINI_COMMENTARY.md` for its
 server-only credentials, restricted writer configuration and local tests.
 
@@ -222,12 +245,14 @@ References: [Firebase transactions](https://firebase.google.com/docs/firestore/m
 
 ## 8. Validation and file guide
 
-Verified locally: 124 regular tests, 8 Firestore emulator integration tests and
-2 headless Chrome end-to-end tests pass (134 total). ESLint and the production
-build pass. The build reports a non-blocking large-chunk warning. The production
-dependency audit reports zero vulnerabilities after the gRPC override; npm
-still reports 21 moderate development-tool advisories. No forced dependency
-downgrades or automatic `audit fix --force` were applied.
+Latest completed implementation checks, at the repository-class milestone on
+3 November 2026: **159 regular tests, 12 Firebase emulator integration tests and
+8 mocked browser tests passed (179 total, zero failures)**. ESLint and production
+build passed; the build retains a non-blocking large-chunk warning. These are
+local regression results, not fresh production/provider checks. No dependency
+security audit was rerun for this documentation update.
+
+The following file/change record describes the original Firebase milestone:
 
 Created:
 
