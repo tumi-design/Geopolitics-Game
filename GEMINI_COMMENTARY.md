@@ -1,264 +1,55 @@
-# Gemini battle commentary
+# Gemini AI Battle Commentary
 
-## What is implemented
+I integrated the **Gemini Developer API** into my Geopolitics Game to generate short commentary about selected battle events. The configured model is `gemini-3.5-flash-lite`, accessed through Google's official `@google/genai` SDK.
 
-The root `api/battle-commentary.js` exports a Vercel Node Function. React sends
-the signed-in owner's Firebase ID token plus a game ID and event ID to that
-function. Gemini is **never** called by React. `GEMINI_API_KEY` and the server
-writer password must never use a `VITE_` prefix, be pasted into chat, appear in
-source, or be committed. `.env.local`, `.env.commentary-emulator.local` and
-Vercel local state are ignored by Git; `.vercelignore` also excludes local
-environment files from CLI uploads.
+**Gemini describes battles; it does not control NPCs, roll dice, change soldiers or decide winners.**
 
-Configured model: **`gemini-3.5-flash-lite`**, through the official `@google/genai`
-SDK. A previous development milestone recorded a successful real SDK request.
-The latest regression checks use mocks; they do not reverify current model access,
-pricing or remaining provider quota. The administrator should check AI Studio's
-Usage / Rate limits and the provider references below. The implementation does
-not enable billing or silently
-switch to a paid model. References:
-[model](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite),
-[pricing](https://ai.google.dev/gemini-api/docs/pricing),
-[rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
+## How it works
 
-Automatic sampling now considers the **first ongoing phase causing a soldier
-loss within each attack**, plus successful conquest, a stopped attack, or an
-attack failing when its source reaches one soldier. All-tie phases, subsequent
-ongoing phases, attack starts, transfers and reinforcements do not add automatic
-candidates. Immediate conquest produces an outcome candidate only. An owner
-may still explicitly request commentary for a later casualty-producing ongoing
-phase. Pending conquest is narrated only after occupation completes.
+1. A battle event is saved to Cloud Firestore.
+2. The React app identifies an eligible event and sends its game ID and event ID, together with the owner's Firebase authentication token, to the Vercel Function `api/battle-commentary.js`.
+3. The server verifies ownership, retrieves the saved event and checks its dice, losses and outcome against the game rules.
+4. Gemini generates interpretive commentary. The server rejects responses with unsupported numerical claims, contradictory outcomes or invalid formatting.
+5. Accepted commentary is saved against the event ID in Firestore and displayed in the separate **Gemini Commentary** panel.
 
-Sampling observes newly persisted battle history, independently of Live Activity,
-history selection and **1×/2×/4×** playback. The local scheduler permits one
-request in flight and one pending candidate, with at least **30 seconds between
-automatic starts**. Explicit owner requests share its in-flight lock but retain
-their existing server-enforced retry rules. Completed outcomes outrank ongoing
-samples; newer candidates of the same priority replace older ones. An unsent
-ongoing sample is dropped when that battle ends or a new attack starts. This is
-a bounded sampler, not a backlog: some events deliberately receive no AI text.
+The server uses saved facts rather than trusting battle information supplied by the browser. Reading old commentary or refreshing a game does not generate it again. Spectators can read saved commentary for shared games but cannot request new text.
 
-Initial/restored history establishes a baseline and never initiates generation.
-Opening games, refreshing, selecting history and returning to latest do not
-request old commentary. Saved entries and already-attempted events are skipped.
-Loading the commentary collection defers newly observed work until it can be
-checked against saved entries. Signing out, changing games or losing ownership
-disposes unsent work; an already-dispatched server request may still finish and
-save against its original game/event. Gameplay and each NPC save continue without
-waiting for Gemini. This is client-driven scheduling, not a background server job.
+## When commentary is generated
 
-Failures and existing pending leases discard queued work and suspend automatic
-sampling until the server's `retryAfter` (or a conservative local cooldown when
-none is supplied). Events occurring during that cooldown are skipped, not
-backfilled. The failed event is never automatically retried; an authorised owner
-may explicitly retry under the unchanged server rules. New events after cooldown
-may be sampled. Quotas and provider latency mean this improves commentary **as
-combat progresses**, but cannot guarantee text for every battle or before a fast
-battle ends. Limits are preserved, not bypassed to satisfy a demonstration.
+Automatic commentary considers the **first casualty-producing ongoing phase** of an attack and completed outcomes such as conquest, a stopped attack or a failed attack. It works independently of 1×, 2× and 4× NPC playback. Owners can also use the available manual Generate/Retry controls.
 
-Gemini receives countries, the sampled paired dice, verified losses, remaining
-armies, occupation/reward and any immediately recorded elimination/victory.
-The server recomputes paired-dice results using the existing rules and rejects
-inconsistent records. All interpretation prose is generated by Gemini; it does
-not choose narration from a phrase catalogue. Country placeholders are filled
-with verified names. The narrative interprets the supplied numeric facts
-without repeating quantities or casualty claims already displayed in the battle
-panel. Output with numeric claims, malformed placeholders, contradictory
-outcome wording, wrong fact hash, excessive length or unusable JSON is rejected. Interpretive statements
-remain AI text, so the deterministic battle panel stays authoritative.
+The commentary panel has its own history. Players can keep an older entry selected and choose **Return to latest saved commentary** to follow new entries.
 
-Ongoing facts explicitly use `outcome: ongoing` and a verified phase number.
-The server reads the preceding saved phase/start to check its sequence and
-before/after armies. An ongoing phase must retain at least two attackers and one
-defender and cause a real loss; it is never labelled an attack failure. The prompt
-describes that phase's uncertainty, and validation rejects final-result claims.
-Completed-event fact shapes/hashes are unchanged, preserving existing cached text.
+## Request limits and reliability
 
-Failures show an unavailable/retry status. No predetermined text is presented
-as generated commentary. Commentary never changes game state, blocks gameplay,
-modifies NPC strategy, or calls an LLM to choose moves.
+| Control | Limit |
+| --- | --- |
+| Automatic request spacing | At least 30 seconds |
+| Pending work | One request in flight and one pending candidate |
+| Global requests | 2 attempts/minute; 20 attempts/UTC day |
+| Per owner | 8 attempts/UTC day |
+| Per event | 2 attempts; at least 1 minute before retrying a failure |
 
-## Secure persistence without service accounts
+Completed outcomes take priority over ongoing samples. Excess events are skipped rather than queued indefinitely, and failures are not retried automatically. Google's own provider limits may be lower. **Not every battle is guaranteed commentary**, but gameplay continues normally when generation is unavailable.
 
-To preserve the project's restriction against service-account credentials, the
-server uses a dedicated **Firebase Authentication Email/Password account** as a
-least-privilege writer. Its password stays in server environment variables.
-It is not a human player's account. No Admin SDK, service-account JSON, Firebase
-Cloud Function, billing upgrade or paid extension is required.
-
-The Console-controlled document `serverConfig/commentary` contains the field
-`writerUid`. Firestore rules let that UID write only commentary and private
-quota records, not another owner's game, soldiers or battle history. Ordinary
-owners and spectators cannot create or modify commentary, even if they call
-Firestore directly. Shared games expose saved commentary read-only; private
-games keep it private. Owners may remove commentary only as part of deleting
-the whole game. Configuration cannot be read or changed through client rules.
+## Firebase storage and security
 
 ```text
-games/{gameId}/commentary/{battleEventId}
-  eventId, state (pending / ready / failed), text, model, factsHash,
-  attempts, createdAt, updatedAt, retryAfter
+games/{gameId}/commentary/{eventId}
+  eventId, state, text, model, factsHash, attempts, timestamps
 serverConfig/commentary
-  writerUid                     # Console administrator controls this
+  writerUid
 commentaryQuota/global
-commentaryQuota/{ownerUid}       # accessible only to the server writer
+commentaryQuota/{ownerUid}
 ```
 
-The server verifies the caller through Firebase Auth, checks the game owner,
-reads the event from Firestore with that caller's token, and accepts no browser
-prompt, country name or casualty input. Requests require POST JSON, a bounded
-body, valid IDs and same-origin browser requests. Anonymous and spectator
-requests cannot generate anything. REST calls with Firebase ID tokens continue
-to obey the deployed Firestore rules.
+I used a dedicated **Firebase Authentication writer account** for server-side commentary persistence, instead of an Admin SDK or service-account JSON file. Firestore rules restrict the writer to commentary and quota records, not game moves. Quota counters and pending event claims reduce duplicate generation across tabs or server instances.
 
-Atomic preconditions claim each event and increment durable counters together.
-They work across Vercel instances, tabs and refreshes. Ready records are cached
-permanently with their immutable event ID. Pending claims suppress concurrent
-generation. No automatic provider retry is made. Failure requires an explicit
-owner retry after at least a minute, with at most **two attempts per event**.
-Application limits are **two attempts per minute globally, twenty per UTC day
-globally, and eight per owner per UTC day**. Failed attempts count too. Google
-may impose lower quotas. Do not delete/reset production counters to bypass a
-provider limit.
+The Gemini API key and writer password remain in server-side environment variables, never in React or browser-exposed `VITE_` variables.
 
-A provider timeout or process crash creates an uncertainty window: a call may
-have reached Google without a saved response. The lease prevents automatic
-repetition; a later explicit retry can make another bounded call. No system
-without provider idempotency can promise exactly-once billing across that gap.
-Responses are stored only on the associated commentary document with an update
-precondition, never by replacing the main game document. A response for an old
-battle therefore cannot overwrite newer moves or appear under a new battle.
+## Configuration and testing
 
-## Local browser testing: recommended isolated demo setup
-
-This section enables **real quota-consuming generation**, even though Firebase
-data is isolated in demo emulators. For mocked browser regressions, use
-[FIREBASE_SETUP.md](FIREBASE_SETUP.md#6-automated-checks-and-local-emulators) instead;
-no real commentary API or key is needed for that suite.
-
-Use Node 24 (the tested runtime) and Java 21+ on PATH.
-Keep the real `GEMINI_API_KEY=...` saved in the root `.env.local`. Do not replace
-or print that file. Install dependencies with `npm.cmd install` if needed.
-
-**Terminal 1**, repository root:
-
-```powershell
-java -version
-npx.cmd firebase emulators:start --project demo-uct-inf4001n --only auth,firestore
-```
-
-If `java -version` fails, install a Java 21+ runtime and add its `bin` directory
-to PATH before starting the emulators.
-
-**Terminal 2**, same root:
-
-```powershell
-npm.cmd run setup:commentary-emulator
-$env:COMMENTARY_USE_EMULATORS='true'
-npm.cmd run dev:api
-```
-
-The setup command creates only a demo Auth writer and demo configuration through
-fixed loopback URLs. It puts local-only writer credentials in ignored
-`.env.commentary-emulator.local`, without printing them or copying the Gemini
-key. Run it again after restarting/clearing emulators. `dev:api` loads that
-writer configuration only when the explicit emulator flag is true; it loads
-your real Gemini key from `.env.local`. The API listens on `127.0.0.1:3001`.
-
-**Terminal 3**, same root:
-
-```powershell
-$env:VITE_USE_FIREBASE_EMULATORS='true'
-$env:VITE_FIREBASE_PROJECT_ID='demo-uct-inf4001n'
-$env:VITE_FIREBASE_API_KEY='demo-key'
-$env:VITE_FIREBASE_AUTH_DOMAIN='demo-uct-inf4001n.firebaseapp.com'
-$env:VITE_FIREBASE_STORAGE_BUCKET='demo-uct-inf4001n.appspot.com'
-$env:VITE_FIREBASE_MESSAGING_SENDER_ID='123'
-$env:VITE_FIREBASE_APP_ID='demo-app'
-npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort
-```
-
-Open **http://127.0.0.1:5173/**. Vite proxies `/api` to the local adapter that
-executes the exact exported Vercel handler. No Vercel account/link is necessary
-for this local setup. Restart the API process after changing server code or
-environment variables; Vite still hot-reloads React normally. Restart both
-processes after changing their environment configuration.
-
-Register a demo player, create a game, and roll a casualty-producing phase that
-leaves the attack ongoing, or finish/stop an attack. At any playback speed, sampled
-commentary is requested automatically when the scheduler and quotas permit.
-Stopping before any dice is supported and
-does not fabricate casualties. Refresh the page: ready commentary should be
-restored without another Gemini call. Share the game and open its link in an
-incognito window to see the same saved text with no generation controls.
-Use the standalone **Gemini Commentary** panel to select saved text newest first.
-Selection stays pinned as battles advance; **Return to latest saved commentary**
-resumes following the newest saved event. Phase entries identify their phase, so
-late text does not imply it describes the current board. Compact saved text also
-remains in Battle history. All countries, phase results,
-NPC explanations and histories remain unchanged.
-
-If unavailable, check the status, local API terminal and AI Studio quota. API
-errors deliberately exclude keys, tokens, passwords and raw SDK diagnostics.
-Stop servers with Ctrl+C. Use fresh terminals for real-project work so demo
-environment overrides are not retained. Emulator games/users disappear on
-restart unless you explicitly export them; Gemini calls still consume the
-real key's free-tier allowance.
-
-## Real Firebase project: manual administrator steps
-
-These are administrator configuration/reproduction instructions, not a claim
-that existing production setup is missing. The owner reports a live deployment
-and deployed rules. Confirm its current settings; do not duplicate an existing
-writer account or change rules merely to follow this guide.
-
-1. Firebase Console → project `uct-inf4001n-geopolitics` → Authentication →
-   Users → Add user. Create a dedicated writer email/password. Use a long,
-   unique password, keep it private, and do not use this account to play.
-2. Copy that account's UID. In Firestore Console create collection
-   `serverConfig`, document `commentary`, string field `writerUid` set to that
-   exact UID. Use the Console's administrator access, not browser game code.
-3. Append these values to your existing root `.env.local`, without changing
-   its Gemini key or current Firebase web configuration:
-
-```dotenv
-COMMENTARY_WRITER_EMAIL=your-dedicated-writer-email
-COMMENTARY_WRITER_PASSWORD=your-long-private-writer-password
-COMMENTARY_WRITER_UID=the-exact-authentication-uid
-COMMENTARY_USE_EMULATORS=false
-```
-
-4. `FIREBASE_PROJECT_ID` may be set explicitly. The server otherwise uses
-   `VITE_FIREBASE_PROJECT_ID`. `FIREBASE_WEB_API_KEY` is an optional override;
-   otherwise it reads `VITE_FIREBASE_API_KEY`. These Firebase web identifiers
-   are not the Gemini key. Keep the Gemini key only as `GEMINI_API_KEY`.
-5. Deploy the updated security rules yourself:
-
-```powershell
-npx.cmd firebase login
-npx.cmd firebase deploy --project uct-inf4001n-geopolitics --only "firestore:rules,firestore:indexes"
-```
-
-6. Confirm the deployed rules in Firestore Console. Local files/emulator tests
-   do not prove production deployment. In fresh terminals, run
-   `npm.cmd run dev:api` and `npm.cmd run dev`, using emulator flags false.
-   Register/login with a normal player account and follow the browser checks.
-
-If a writer credential is compromised, change its password and replace/revoke
-the configured `writerUid` to remove its rule authorization immediately. Never
-weaken the rules to allow owner/client commentary writes as a workaround.
-
-## Vercel deployment and maintenance
-
-Live application: [uct-inf-4001-n.vercel.app](https://uct-inf-4001-n.vercel.app).
-This guide explains reproduction and maintenance; documentation updates do not
-deploy, inspect private production settings or certify the deployed commit.
-
-For a new deployment, import this repository into Vercel using the Vite preset. Root
-`api/battle-commentary.js` becomes the same-origin function; `vercel.json` sets
-a sixty-second limit. Configure the existing `VITE_FIREBASE_*` web variables
-and these **server-side** variables in the Vercel project's Settings →
-Environment Variables, for the appropriate Production/Preview environments:
+The server uses these environment variables, with real values kept outside the repository:
 
 ```text
 GEMINI_API_KEY
@@ -266,144 +57,30 @@ COMMENTARY_WRITER_EMAIL
 COMMENTARY_WRITER_PASSWORD
 COMMENTARY_WRITER_UID
 COMMENTARY_USE_EMULATORS=false
-FIREBASE_PROJECT_ID=uct-inf4001n-geopolitics   (optional explicit override)
-FIREBASE_WEB_API_KEY                       (optional explicit override)
 ```
 
-Do not add `VITE_` to the Gemini key or writer credentials. Do not upload local
-environment files or commit values. Redeploy after changing Vercel variables.
-Add the deployed hostname to Firebase Authentication's authorized domains.
-Confirm the real-project writer/rule configuration above first. Firebase remains on
-Spark; no Firebase billing upgrade is required. Vercel and Gemini have their
-own quotas/terms; keep their free-tier limits and do not enable paid fallback.
+The writer UID must match the administrator-controlled `serverConfig/commentary.writerUid` field. Optional server overrides are `FIREBASE_PROJECT_ID` and `FIREBASE_WEB_API_KEY`; otherwise the server uses the relevant configured Firebase web identifiers. The variables are set in Vercel for the deployed Function, while local private settings are kept in ignored environment files.
 
-## Tests and files for a presentation
+For local use, start the frontend and commentary API in separate PowerShell terminals after configuring Firebase and Gemini:
 
 ```powershell
-npm.cmd test
-npm.cmd run test:firebase
-npm.cmd run lint
-npm.cmd run build
+npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
-
-The commands above are routine checks; emulator tests write only demo fixtures.
-Do not opt into live-provider tests while running a safe regression suite.
-**Optional real-quota check, only when deliberately authorised:**
 
 ```powershell
-npm.cmd run check:gemini
+npm.cmd run dev:api
 ```
 
-The local API and smoke commands prefer IPv4 to avoid a Windows Google
-connection timeout encountered during verification. The server SDK itself
-still has a finite timeout and does not automatically repeat provider calls.
+Normal tests use mocked Gemini responses and do **not** consume provider quota. Isolated Firebase emulator tests use demo data. During development, a separate opt-in real-provider test also confirmed generation, saved commentary, refresh restoration and spectator visibility. An explicit API check is available through `npm.cmd run check:gemini`, which **does consume real Gemini quota**.
 
-`check:gemini` is explicitly quota-consuming and makes a small real SDK request
-for a labelled synthetic development battle. It prints only the selected model,
-generated text or sanitized failure category. Regular tests use labelled mocks
-and do not call Gemini. With the demo emulators/Vite running, browser tests use
-`UI_TEST_URL` and an installed Playwright Chromium (or `CHROME_PATH`) as
-documented in `FIREBASE_SETUP.md`. Run Firestore tests before browser tests,
-not concurrently, because the rule suite clears the demo database and config.
-Then rerun `setup:commentary-emulator` before any real local generation.
+The completed project checks passed **159 standard tests, 12 Firebase emulator tests and 10 browser tests**, as well as ESLint and the production build.
 
-To explicitly verify the complete real provider path with an isolated demo game:
+## Main source files
 
-```powershell
-$env:RUN_LIVE_GEMINI='true'
-$env:UI_TEST_URL='http://127.0.0.1:5173/'
-# Optional, if using an installed Chrome instead of Playwright's Chromium:
-$env:CHROME_PATH='C:\Program Files\Google\Chrome\Application\chrome.exe'
-node --test tests/commentary.live.test.js
-Remove-Item Env:RUN_LIVE_GEMINI
-```
+- `api/battle-commentary.js` — Vercel Function entry point.
+- `server/` — authentication, verified battle facts, Gemini requests, stored results and quota checks.
+- `src/game/commentaryEvents.js` and `commentaryScheduler.js` — eligible events and request pacing.
+- `src/hooks/useBattleCommentary.js` — commentary subscriptions and generation requests.
+- `src/components/BattleCommentary.jsx` — commentary panel and history.
 
-This makes one real generation request and verifies saved text after refresh and
-in a spectator browser. It refuses to use a non-demo Firebase project. It is
-skipped by normal test runs.
-
-For a fully automated foreground run, stop terminal 2's API first, set
-`$env:LIVE_API_IN_PROCESS='true'`, and run the live test with
-`node --dns-result-order=ipv4first --test tests/commentary.live.test.js`.
-It starts and closes the same local API adapter within the test process.
-Remove `LIVE_API_IN_PROCESS` afterwards. This is also useful when a restricted
-development environment blocks network access from background processes.
-
-- `server/commentaryFacts.js`: validate saved events and derive verified facts.
-- `server/geminiCommentary.js`: model, prompt, official SDK call and output checks.
-- `server/firebaseRest.js`: caller authentication and restricted writer login.
-- `server/commentaryStore.js`: atomic event leases, caching and quota counters.
-- `server/commentaryHandler.js`: HTTP validation, authorization and orchestration.
-- `api/battle-commentary.js`: Vercel entry point, with no credential logging.
-- `src/hooks/useBattleCommentary.js`: separate live commentary subscription and
-  generation requests, without updating the game state.
-- `src/services/commentaryClient.js`: authenticated, in-flight-deduplicated POST.
-- `src/components/BattleCommentary.jsx`: secondary display and retry status.
-- `src/game/commentaryEvents.js`: eligible ongoing/outcome events and per-attack sampling.
-- `src/game/commentaryScheduler.js`: bounded automatic sampling, pacing and cooldowns.
-- `scripts/dev-api.mjs`, `setup-commentary-emulator.mjs`, `check-gemini.mjs`:
-  local handler adapter, safe demo writer setup and explicit real smoke check.
-
-Remaining handover work: verify the deployed commit and production settings,
-complete final acceptance evidence and confirm UCT submission/access arrangements.
-The live URL does not by itself establish current Gemini generation or quota.
-The existing engine, NPC
-strategy, map customization and fifty-five-country catalogue are unchanged.
-
-## Verification and complete change list
-
-Latest completed repository-class milestone, 3 November 2026: **159 regular tests,
-12 Firebase emulator tests and 8 mocked browser tests passed (179 total, zero
-failures)**, with clean ESLint and a successful build (large-chunk advisory).
-No real provider request was made for that milestone or this documentation update.
-The dated entries below are historical records, not current production certification.
-
-Compliance-sampling update verified on 2 November 2026 with **154 regular tests,
-10 Firebase emulator integration tests and 8 browser tests** passing, **0
-failures** (172 tests across the separate runs). Browser regressions hold mocked
-responses while real NPC rolls continue at 1×/2×/4×, then check pinned reading,
-late saved results and refresh without regeneration. New pure scheduler tests use
-a fake clock for coalescing, 30-second pacing, cooldowns, lease responses and
-disposal. Regression hashes cover all three existing terminal outcomes. This
-update made **no real Gemini requests and no production Firestore changes**.
-ESLint and the production build pass, with the existing bundle-size advisory.
-No security rules, schema, server quotas/leases, engine or NPC changes are needed.
-
-The older verification below records the original integration milestone; its
-opt-in real-provider test was **not** rerun for this update.
-
-Verified on 1 November 2026: **136 regular tests**, **10 Firebase emulator
-integration tests**, **3 browser regression tests**, and **1 opt-in real Gemini
-browser test** pass (150 total across the separate suites). The real test
-confirmed generation through the endpoint, persistence to demo Firestore,
-refresh without another API request, and unauthenticated spectator display.
-The real screenshot is in ignored `test-results/real-gemini-commentary.png`.
-These checks do not claim that production rules, writer configuration or Vercel
-deployment are complete.
-
-ESLint and the production build pass. The build retains the existing
-non-blocking bundle-size advisory. The production dependency audit reports
-zero vulnerabilities; the development tooling still reports 21 moderate
-advisories. A private-value check confirmed that the Gemini key and writer
-passwords are absent from every built browser asset.
-
-Created: `api/battle-commentary.js`; the five `server/` modules listed above;
-`scripts/check-gemini.mjs`, `scripts/dev-api.mjs`,
-`scripts/setup-commentary-emulator.mjs`; `src/game/commentaryEvents.js`,
-`src/hooks/useBattleCommentary.js`, `src/services/commentaryClient.js`,
-`src/components/BattleCommentary.jsx`; `tests/commentary.test.js`,
-`tests/commentary.live.test.js`; `.vercelignore`, `vercel.json` and this guide.
-The setup helper also creates ignored `.env.commentary-emulator.local`,
-containing only local demo writer credentials, not the Gemini key.
-
-Modified: `.env.example`, `.gitignore`, `package.json`, `package-lock.json`,
-`vite.config.js`, `firestore.rules`, `src/App.jsx`,
-`src/components/GameActivity.jsx`, `src/components/gameplay.css`,
-`src/services/gameRepository.js` (delete commentary with its game),
-`tests/firebase.integration.test.js`, `tests/firebase.browser.test.js`,
-`README.md`, `ARCHITECTURE.md`, `FIREBASE_SETUP.md`, `src/game/README.md` and
-`REQUIREMENTS_CHECKLIST.md`.
-
-No engine, NPC strategy, map rendering or country-catalogue files were changed.
-No service-account credentials, commits, pushes, billing changes or production
-deployments were made. Existing UCT PDFs remain untracked.
+See [README.md](README.md) for general setup and [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for Firebase configuration and security rules.

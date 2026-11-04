@@ -1,162 +1,52 @@
 # UCT INF4001N — Web Application Architecture
 
-## 1. Project objective
+I built **Geopolitics** as a single-player strategy web application using React, Firebase and Vercel. My main design decision was to separate **game rules, interface components, database access and AI commentary**, so that each part can be tested and maintained independently.
 
-Develop a deployed, single-player geopolitical strategy game
-that meets the INF4001N entrance-exam requirements.
+**Live application:** [Play Geopolitics](https://uct-inf-4001-n.vercel.app)
 
-The player competes against strategic non-player characters
-(NPCs) to conquer ten countries.
+## Technologies and project structure
 
-## 2. Technology stack
+| Technology | Purpose |
+| --- | --- |
+| React and JavaScript | Built the interactive game interface and its components |
+| Vite | Ran the project locally and created production builds |
+| React Leaflet / Leaflet | Displayed the interactive world map |
+| Firebase Authentication | Managed account registration, login and authentication sessions |
+| Cloud Firestore | Stored games, player progress, histories and commentary in a NoSQL database |
+| Vercel | Hosted the web application and its server-side API function |
+| Gemini API (`@google/genai`) | Generated commentary based on recorded battle events |
+| Node.js tests, Firebase emulators and Playwright | Tested the game logic, database integration and browser behaviour |
+| ESLint | Checked the JavaScript code for issues |
+| Git and GitHub | Managed changes to the source code |
 
-- Frontend: React
-- Development and build tool: Vite
-- Language: JavaScript
-- Code quality: ESLint
-- Version control: Git
-- Source-code hosting: GitHub
-- Authentication: Firebase Authentication
-- NoSQL database: Cloud Firestore
-- Application hosting: Vercel
-- Server-side AI integration: Vercel Functions
-- AI-generated battle commentary: Gemini Developer API via the official
-  `@google/genai` SDK, with fact validation and bounded sampling.
+## Game engine and NPCs
 
-## 3. Application structure
+The engine in `src/engine/` manages turn order, soldiers, dice battles, reinforcements, transfers, conquest and victory. It validates actions before updating a game. Randomness is limited to mechanics such as country selection, turn order and dice rolls.
 
-```text
-src/
-  components/   Reusable interface components
-  hooks/        Authentication, saved sessions and commentary coordination
-  game/         UI action routing and commentary sampling/scheduling
-  engine/       Game rules, combat and NPC strategy
-  services/     Database, authentication and API services
-  data/         Country and population data
+The nine NPCs use programmed strategies to assess targets, army strength and possible rewards. Their decisions and explanations are recorded. **Gemini does not decide NPC moves or battle outcomes.**
 
-api/
-  battle-commentary.js   Server-side AI commentary endpoint
-server/        Commentary validation, generation, quotas and Firebase REST
-scripts/       Local API adapter, emulator setup and explicit provider checks
-```
+## Object-oriented database access
 
-## 4. Core design principles
+I implemented a `GameRepository` class in `src/services/gameRepository.js`. It receives a Firestore connection through its constructor (**dependency injection**) and keeps its internal state in private members such as `#database` and `#gameRef()`.
 
-- Separate the user interface from the game rules.
-- Separate database operations from the rest of the application.
-- Use classes and encapsulation where appropriate.
-- Keep game rules deterministic except for explicitly random
-  mechanics such as country selection and dice rolls.
-- Keep AI-generated commentary separate from game logic.
-- Validate actions before changing the game state.
-- Handle loading states, errors and invalid actions.
-- Never expose AI API keys or other secrets in frontend code.
-- Enforce authentication and authorisation through database
-  security rules, not merely through interface controls.
+Its public `create`, `update`, `watch`, `watchList` and `remove` methods give the rest of the application a consistent way to work with saved games. This demonstrates **encapsulation** while keeping Firestore operations separate from the UI and game engine.
 
-## 5. Main application components
+`gameStorage.js` validates and prepares saved game state. Firestore transactions, revision checks and mutation IDs help prevent outdated updates or duplicate saves. Battle and NPC histories are stored in separate subcollections so they can grow without enlarging the main game document indefinitely.
 
-Game engine:
-Manages game state, turn order, combat, soldier transfers,
-reinforcements, conquest, elimination and victory.
+## Authentication and security
 
-NPC strategy:
-Evaluates the board and selects strategic actions.
-Displays a brief justification for each NPC decision.
+Firebase Authentication identifies players. Games are private by default; owners can enable read-only live spectator links. Firestore security rules restrict changes to authorised owners and control access to shared games.
 
-Database service:
-Creates, retrieves and updates saved games in Firestore.
+These rules enforce database permissions, **not** the full gameplay logic contained in the saved state. The application is a single-player game with spectators, not a server-authoritative multiplayer system.
 
-Authentication service:
-Supports account creation, login and logout.
+## Gemini integration
 
-Battle commentary service:
-Sends battle-event information to a server-side endpoint
-that requests dynamic commentary from an LLM.
+The React app sends an eligible saved battle event ID to `api/battle-commentary.js`. The server verifies the owner and recorded battle facts, requests Gemini commentary and stores accepted text in a separate Firestore subcollection.
 
-User interface:
-Displays countries, soldier counts, actions, combat results,
-NPC decisions, battle commentary and fast-forward controls.
+The Gemini API key and restricted commentary writer credentials remain server-side. Commentary is rate-limited, may not be available for every battle and **never changes the game result**.
 
-## 6. Access control
+## Deployment and testing
 
-- Visitors may view a shared game.
-- Authenticated users may play their own games.
-- Visitors may not modify another player's game.
-- Database rules must restrict game modifications to the
-  authorised owner.
-- API secrets must remain server-side.
+I used GitHub for source control and Vercel for hosting. Completed checks passed **159 standard tests, 12 Firebase emulator tests and 10 browser tests**, plus ESLint and the production build.
 
-## 7. Deployment
-
-Live application: [uct-inf-4001-n.vercel.app](https://uct-inf-4001-n.vercel.app),
-as supplied by the project owner. These are maintenance/verification steps;
-local test results do not establish the currently deployed commit or settings.
-
-- Develop and test locally using Vite.
-- Store source code in the private GitHub repository.
-- Deploy the application through Vercel.
-- Connect the deployed application to Firebase.
-- Configure production environment variables securely.
-- Test the deployed application before submission.
-
-## 8. Implementation status
-
-### Object-oriented database access
-
-`src/services/gameRepository.js` exports the `GameRepository` class. Each instance
-represents one game-storage service and receives its Firestore connection through
-`constructor(database)`. This is dependency injection: the application supplies its
-configured connection, while tests supply isolated emulator connections. A missing
-dependency fails immediately instead of failing during a later save.
-
-The connection is held in `#database`. JavaScript enforces the privacy of this
-field and the `#games()` / `#gameRef(id)` helpers: callers cannot read or replace
-them through ordinary object properties. Public methods `create`, `update`,
-`watch`, `watchList` and `remove` provide the service's interface. Their existing
-arguments, results and errors are preserved. Constructor binding lets these
-methods be passed as callbacks without losing their instance, and keeps the
-existing browser tests' temporary method replacement possible.
-
-This demonstrates a class combining private state with related behaviour, rather
-than putting gameplay functions into a cosmetic class. The previous factory
-already encapsulated its connection through a closure; the class now makes the
-repository's contract and encapsulation explicit. `createGameRepository(database)`
-still returns a configured instance, and the `gameRepository` singleton keeps
-existing React callers unchanged. Subscription state stays local inside each
-`watch()` invocation, so concurrent game listeners and their unsubscribe functions
-remain independent.
-
-Private fields organise client code; Firestore rules still enforce authorisation.
-The refactoring leaves transactions, revision checks, idempotent retries, staged
-deletion, stored data, engine rules, NPC strategy and Gemini services unchanged.
-
-The tested engine, strategic NPCs, 55-country catalogue and playable React map
-interface are implemented. Firebase integration now lives in `src/services/`:
-`firebase.js` configures the SDK, `gameStorage.js` encodes/restores the engine
-state, and `gameRepository.js` owns Firestore queries, transactions and listeners.
-`useAuth.js` restores account sessions; `useGameSession.js` connects the existing
-engine to serialized cloud saves and step-by-step NPC playback. Account, library
-and save/sharing controls are separate React components.
-
-Games are separate single-player sessions, each with one human and nine NPCs;
-sharing adds read-only spectators, not multiplayer turn-taking. They have
-private owner-controlled core documents and append-only battle/NPC
-history subcollections. Shared games expose read-only live listeners; only the
-owner can edit. Rules are tracked in `firestore.rules`; production rule/settings
-verification and real-project acceptance checks are administrator tasks, not
-implied by a local build. See `FIREBASE_SETUP.md` for
-the schema, emulator tests, deployment commands and limitations.
-
-Gemini battle commentary now uses `api/battle-commentary.js` with server helpers
-in `server/`. A dedicated restricted Auth writer persists commentary in its own
-subcollection, independently of engine saves. See `GEMINI_COMMENTARY.md` for
-authorization, quotas, local setup and deployment verification. Automatic sampling
-includes the first casualty-producing ongoing phase per attack and completed
-outcomes at every playback speed, with one in-flight/one pending request and
-30-second automatic pacing. Saved reading selection is independent of generation;
-provider latency and quotas prevent guaranteed commentary for every battle.
-
-The website is deployed at the address above. Final acceptance evidence, source
-ZIP, private assessor access and Amathuba submission still need confirmation.
-The assessor-facing entry point and setup instructions are in [README.md](README.md).
+See [README.md](README.md) for gameplay and setup, [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for database details and [GEMINI_COMMENTARY.md](GEMINI_COMMENTARY.md) for AI implementation.

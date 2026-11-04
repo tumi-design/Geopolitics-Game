@@ -1,126 +1,44 @@
-# UCT INF4001N — Marksheet Requirements Checklist
+# UCT INF4001N — Project Requirements and Marking Criteria
 
-Recorded project deadline: 6 November 2026, 23:00. Confirm the official
-assignment notice before submission.
+This document shows how my **Geopolitics Game** addresses the entrance examination requirements and where the assessor can find evidence in the source code.
 
-Status key:
+**Live application:** [Play Geopolitics](https://uct-inf-4001-n.vercel.app)
 
-- [x] Implemented with local test/source evidence, or explicitly supplied deployment information.
-- [ ] Outstanding or not yet independently verified.
+## Implemented requirements
 
-This is an implementation/handover checklist, not a marking decision. Latest
-completed implementation checks: 159 standard tests, 12 emulator tests and
-8 mocked browser tests passed (179 total). No production or real-provider
-checks were performed during this documentation update. See [README.md](README.md).
+- **Game setup:** One human player chooses a country; nine NPC countries are selected randomly from a catalogue of 55. Starting soldiers follow the prescribed population thresholds, and turn order is randomised.
+- **Gameplay:** The game supports one initiated attack per turn, consecutive dice phases, soldier losses and ties, stopping an attack, conquest rewards, occupation, transfers, reinforcements from round two, elimination and victory.
+- **NPCs:** Opponents assess army strength and potential targets, allocate soldiers, transfer armies and decide whether to continue attacking. Their actions and explanations are recorded, including during 1×, 2× and 4× playback.
+- **AI:** Gemini generates commentary for selected saved battle events. It does not control NPCs, roll dice or change game outcomes. Commentary is subject to API limits; gameplay continues without it.
+- **Accounts and saving:** Firebase Authentication manages accounts. Cloud Firestore saves game state and histories, including ongoing attacks, and restores saved sessions after refresh.
+- **Spectators:** Owners can enable a live, read-only sharing link. Other viewers cannot take turns, edit a game or request commentary.
+- **Interface:** The app provides a world map, searchable country catalogue, soldier counts, game controls, saved-game selection and battle/NPC/commentary histories.
 
-## A. Core game requirements
+The detailed rules and instructions for playing are in [README.md](README.md).
 
-- [x] Create a new game with 10 countries, including the player's country.
-- [x] Randomly select the other 9 countries.
-- [x] Allocate starting soldiers according to population.
-- [x] Randomise the first player and manage turn order.
-- [x] Implement attack and skip-turn actions.
-- [x] Implement dice combat, soldier losses and ties.
-- [x] Enforce the requirement to leave at least one soldier behind.
-- [x] Implement voluntary stopping of attacks.
-- [x] Implement conquest and soldier rewards.
-- [x] Implement soldier transfers between controlled countries.
-- [x] Award reinforcements from round two onwards.
-- [x] Implement player elimination and victory conditions.
-- [x] Display every country and its soldier count.
-- [x] Display battles, dice rolls, losses and outcomes.
-- [x] Keep battle information visible during fast-forward.
+## Marking criteria and evidence
 
-## B. NPC requirements
-
-- [x] NPCs evaluate the board and choose strategic actions.
-- [x] NPCs choose attack targets and decide when to stop.
-- [x] NPCs allocate reinforcements.
-- [x] NPCs can transfer soldiers between controlled countries.
-- [x] Display each NPC decision with a brief justification.
-- [x] Display NPC decisions during fast-forward.
-
-## C. AI requirements
-
-- [x] Integrate an LLM/AI to generate dynamic battle commentary.
-- [x] Keep AI commentary separate from the game rules.
-- [x] Verify that AI failures do not corrupt the game state.
-
-A previous milestone recorded a real Gemini response; subsequent verification
-uses mocks and demo Firestore. Ongoing-phase sampling and outcomes work at all
-playback speeds, but provider latency, coalescing and quotas mean not every
-battle receives commentary. Production generation/remaining quota need separate
-acceptance evidence; see [GEMINI_COMMENTARY.md](GEMINI_COMMENTARY.md).
-
-## D. Accounts and access control
-
-- [x] Allow visitors to sign up.
-- [x] Allow authenticated users to play their own games.
-- [x] Allow visitors to view shared gameplay.
-- [x] Prevent visitors from taking another player's turn.
-- [x] Apply appropriate database permissions.
-
-## E. Database and architecture
-
-- [x] Use a NoSQL database.
-- [x] Separate database operations from the rest of the application.
-- [x] Connect the application to an online database.
-- [x] Design a suitable database structure.
-- [x] Use clear, maintainable code and appropriate
-      object-oriented concepts.
-- [x] Validate inputs and handle errors.
-- [x] Support saving and retrieving game data.
-
-## F. Interface and usability
-
-- [x] Provide a clear, navigable user interface.
-- [x] Display country ownership and soldier counts clearly.
-- [x] Support viewing, listing and selecting games or countries.
-- [x] Implement searching and filtering where appropriate.
-- [x] Keep game actions and results understandable.
-
-## G. Deployment and submission
-
-- [x] Deploy the application online.
-- [ ] Test the deployed application.
-- [ ] Prepare the source-code ZIP.
-- [x] Provide the deployed application URL.
-- [ ] Provide application login credentials.
-- [ ] Provide the required assessor database access.
-- [x] Prepare the README with setup and running instructions.
-- [ ] Verify all submission files.
-- [ ] Submit through the INF4001N Amathuba assignment folder.
-
-Live URL supplied by the owner: [uct-inf-4001-n.vercel.app](https://uct-inf-4001-n.vercel.app).
-Deployment existence is distinct from final acceptance of the latest commit.
-Application credentials and assessor database access must be provided privately,
-not embedded in this checklist or source archive.
-
-## H. Marking rubric — 14 criteria, 56 marks
-
-Evidence for all 14 criteria is available below. These entries do not certify
-full marks or resolve interpretation questions about commentary coverage or the
-curated 55-country selection list.
-
-| Criterion | Repository evidence |
+| Criterion | Evidence in my application |
 | --- | --- |
-| Database layer | `src/services/gameRepository.js`, `firebase.js` |
-| Connection to database | Firebase SDK initialization, repository transactions/listeners, emulator tests; live acceptance remains separate |
-| Database design | `gameStorage.js`, versioned core, append-only histories, `firestore.indexes.json` |
-| Coding structure | Separate components, hooks, engine, services and server modules |
-| Object-oriented concepts | `GameRepository`, private fields/helpers, bound public methods and injected database |
-| Data validation, controls and security | Engine/storage validation, `firestore.rules`, commentary request/fact checks |
-| Functionality | Engine, session and browser regression tests |
-| Lists, searching, filtering and viewing | Country filtering, saved-game library, map/list and commentary history |
-| User interface | Responsive map, flags, turn controls and activity panels |
-| Ease of navigation | Setup/return flow, saved sessions and accessible history controls |
-| Authentication and authorisation | `useAuth.js`, owner checks, restricted writer and spectator rules |
-| Sophistication and complexity | Combat, strategic NPCs, persisted stepwise playback and live spectators |
-| AI application | Server-side Gemini, ongoing/outcome sampling, validation and persistence; coverage is quota-limited |
-| Overall evidence of effort | Modular implementation, sourced assets/populations and automated coverage |
+| **1. Database layer** | `src/services/gameRepository.js` manages Firestore operations. |
+| **2. Database connection** | Firebase SDK, live listeners and transactions connect games to Cloud Firestore. |
+| **3. Database design** | Versioned game documents and separate battle, NPC and commentary subcollections; `gameStorage.js`. |
+| **4. Coding structure** | Separate `components/`, `hooks/`, `game/`, `engine/`, `services/` and `server/` modules. |
+| **5. Object-oriented concepts** | `GameRepository` uses a class, private members, encapsulation and dependency injection. |
+| **6. Validation and security** | Input/state checks, Firestore rules, ownership restrictions and server-side commentary validation. |
+| **7. Functionality** | Complete turn, attack, conquest, reinforcement, saving and victory workflows. |
+| **8. Lists, search, filtering and viewing** | Country search, saved-game list, world map and activity/commentary histories. |
+| **9. User interface** | Interactive map, flags, soldier counts, battle controls and activity panels. |
+| **10. Navigation** | Game setup, saved sessions, gameplay controls and accessible history selection. |
+| **11. Authentication and authorisation** | Firebase login, owner-only changes and read-only spectators. |
+| **12. Complexity** | Strategic NPCs, multi-phase combat, reliable cloud saves and live spectator updates. |
+| **13. AI application** | Gemini commentary through `api/battle-commentary.js`, with validated events and saved results. |
+| **14. Evidence of effort** | Working deployment, modular code, sourced country data, automated tests and documentation. |
 
-## I. Optional bonus feature
+## Testing and deployment
 
-Live spectator updates and browsable battle/NPC/commentary histories are
-implemented. These are evidence for assessment, not a claim that bonus marks
-have been awarded; full game replay, analytics and LLM-controlled NPCs are not implemented.
+Completed development checks passed **159 standard tests, 12 Firebase emulator tests and 10 browser tests**, as well as ESLint and the production build. The build reports a non-blocking bundle-size warning.
+
+The application is deployed on Vercel at the link above. Application login credentials and assessor database access are supplied separately with the submission.
+
+For implementation details, see [ARCHITECTURE.md](ARCHITECTURE.md), [FIREBASE_SETUP.md](FIREBASE_SETUP.md) and [GEMINI_COMMENTARY.md](GEMINI_COMMENTARY.md). This document identifies evidence for assessment.

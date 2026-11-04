@@ -1,76 +1,37 @@
-# Gameplay and presentation guide
+# Gameplay and presentation
 
-Start the application from the repository root with `npm.cmd run dev` and open
-the Local URL Vite prints. `node --test`, `npm.cmd run lint`, and
-`npm.cmd run build` run the automated checks.
+This folder connects the game's interface to its rules and controls how turns, NPC playback and battle commentary are presented. The [main README](../../README.md) explains how to install and play the application.
 
-The live game is [uct-inf-4001-n.vercel.app](https://uct-inf-4001-n.vercel.app).
-For installation, Firebase environment names and the separate local commentary
-API process, begin with the [root README](../../README.md). Single-player games
-have one human owner and nine NPCs; shared visitors are read-only spectators.
+## How the gameplay works
 
-## Playing a turn
+Each game has one human player and nine computer-controlled opponents (NPCs). The ten participating countries take turns in a random order.
 
-1. Create a game. The engine randomly chooses the starting player. NPCs play
-   automatically, one explained action per timer tick.
-2. On your turn, use the controls below the world overview. From round two,
-   distribute the pending reinforcements before attacking or skipping. Partial
-   allocations are allowed; all remaining soldiers still need allocation.
-3. Choose an owned attacking country and any enemy target. Click Start attack,
-   then Roll combat phase to resolve each phase. Stop attack & end turn preserves
-   the soldiers left on the board. Running out of attacking soldiers ends the
-   turn automatically.
-4. When defenders reach zero, choose occupation soldiers. The existing engine
-   awards the conquest reward to the source first, then moves the chosen amount
-   to the captured country. Leave at least one soldier in both. Complete conquest
-   finalises ownership and ends the turn (or declares victory).
-5. Once you own multiple countries, the transfer form moves soldiers between
-   them outside combat. Transferring does not finish your turn.
+- **Your turn:** From round two, allocate your reinforcements before attacking or ending your turn. You may transfer soldiers between countries you own when you are not attacking.
+- **Attacking:** Select one of your countries and an opposing country. You can start one attack per turn, roll through multiple combat phases, or stop the attack. Countries do not need to share a border.
+- **Conquest:** Defeating all defenders earns bonus soldiers. Choose how many soldiers occupy the captured country, leaving at least one soldier in each country.
+- **End of game:** You win by controlling all ten countries. If you lose your last country, your game ends in defeat.
 
-The map and list inspect countries; the action forms select combat/transfer
-sources and targets. Country ownership, soldier counts, and map tooltips always
-come from the current engine state. Distance never limits target choices.
+## NPCs and game activity
 
-## NPC playback
+NPCs use programmed strategies to decide where to attack, reinforce and transfer soldiers. Their actions and reasons appear in **Live Activity** and the saved history; Gemini does not control their decisions.
 
-Normal speed waits 1600 ms per action, 2x waits 800 ms, and 4x waits 400 ms.
-Speed changes never jump to the final turn state. The existing strategy limits
-combat to 100 phases; the UI additionally stops after 200 actions in one turn.
-Pause stops the timer. Opening new-game setup also suspends playback and retains
-the current game until a replacement is created. Errors retain the last valid
-board. Dismiss an error before resuming playback; persistent invalid state or
-safety-limit errors require starting a new game.
+NPC turns play step by step. You can pause playback or change its speed to **1×, 2× or 4×** without skipping the underlying actions. Battle history preserves dice rolls, soldier losses and outcomes as new events appear. NPC playback runs while the owner's active game is open; it does not continue on a server after the owner closes the game.
 
-Live Activity shows the current battle phase/outcome or latest NPC preparation
-decision. Battle history and NPC decision history retain all earlier records,
-newest first, in separate collapsible, scrollable lists; older dice are not lost
-when the live panel advances.
-NPC explanations are strategy-generated text, not LLM commentary.
+Game progress and histories are saved in **Cloud Firestore** and can be restored from **Saved games**. Spectators can follow a shared game but cannot make moves.
 
-Victory means the human owns all ten countries. If the human loses their last
-country, this local session stops at the defeat position rather than continuing
-to simulate a spectator-only match between the remaining NPCs. The engine's
-victory and elimination rules are unchanged.
+The separate **Gemini Commentary** panel displays AI-generated descriptions of selected ongoing and completed battles. Saved commentary can be revisited, but generation depends on scheduling and API limits. It does not affect the actual battle results. See [GEMINI_COMMENTARY.md](../../GEMINI_COMMENTARY.md).
 
-## Files to explain
+## Main files
 
-- `gameSession.js`: small routing functions send UI actions to the existing engine;
-  `getSessionStatus` decides whether human input or NPC playback is allowed.
-- `../hooks/useGameSession.js`: owns the live game, errors, playback speed and timer.
-  Random engine actions run outside React state updater functions to avoid
-  duplicate execution in development StrictMode. Stale timers are discarded.
-- `../components/TurnControls.jsx`: reinforcement, transfer, combat and occupation forms.
-- `../components/PlaybackControls.jsx`: status, pause, fast-forward and error messages.
-- `../components/GameActivity.jsx`: dice, outcomes, battle history and NPC explanations.
-- `../engine/`: the unchanged, tested game rules and NPC strategy.
+| File | Purpose |
+| --- | --- |
+| `gameSession.js` | Connects interface actions to the game engine and checks which actions are allowed. |
+| `commentaryEvents.js` | Selects battle events that are eligible for commentary. |
+| `commentaryScheduler.js` | Manages automatic commentary requests and pacing. |
+| `../hooks/useGameSession.js` | Coordinates the active game, saved state and NPC playback. |
+| `../components/TurnControls.jsx` | Provides reinforcement, attack, occupation and transfer controls. |
+| `../components/PlaybackControls.jsx` | Provides pause and speed controls and displays playback status. |
+| `../components/GameActivity.jsx` | Displays battles, dice results and NPC decisions. |
+| `../engine/` | Contains the game rules, combat logic and NPC strategy. |
 
-Games and histories are saved to the owner's Firestore sessions and restored
-on refresh. Gemini battle commentary is generated by a separate server endpoint
-and stored alongside its immutable battle event. See `../../GEMINI_COMMENTARY.md`
-for local setup and quota policy. The
-55-country catalogue uses Worldometer's 2026 annual population estimates, with
-per-country source links and reference-year documentation in `../data/README.md`.
-The standalone Gemini Commentary panel samples ongoing phases and completed
-outcomes at all playback speeds, subject to bounded scheduling and quotas. Older
-saved text can stay pinned while play advances. The website is deployed; final
-production acceptance and submission access arrangements still need confirmation.
+Country information and population sources are documented in the [country-data guide](../data/README.md). For the overall system design, see [ARCHITECTURE.md](../../ARCHITECTURE.md).
